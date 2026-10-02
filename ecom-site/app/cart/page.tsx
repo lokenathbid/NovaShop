@@ -1,0 +1,194 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import {
+  ShoppingBag,
+  Minus,
+  Plus,
+  Trash2,
+  Heart,
+  ArrowLeft,
+  ArrowRight,
+  Tag,
+} from 'lucide-react';
+import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { formatCurrency } from '@/lib/utils';
+import Button from '@/components/ui/Button';
+
+function EmptyCart() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+        <ShoppingBag size={36} className="text-slate-600" />
+      </div>
+      <h2 className="font-display text-2xl font-bold text-white mb-2">Your cart is empty</h2>
+      <p className="text-slate-400 mb-8 max-w-xs">
+        Looks like you haven't added anything yet. Explore our premium collection.
+      </p>
+      <Link href="/shop">
+        <Button leftIcon={<ArrowLeft size={16} />}>Continue Shopping</Button>
+      </Link>
+    </div>
+  );
+}
+
+export default function CartPage() {
+  const { items, itemCount, subtotal, discount, shipping, total, updateQuantity, removeItem } =
+    useCart();
+  const { addItem: wishlistAdd } = useWishlist();
+
+  if (items.length === 0) return <div className="max-w-5xl mx-auto px-4 py-8"><EmptyCart /></div>;
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <h1 className="font-display text-3xl font-bold text-white mb-8">
+        Shopping Cart{' '}
+        <span className="text-slate-500 text-xl font-normal">({itemCount} items)</span>
+      </h1>
+
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Items */}
+        <div className="flex-1 flex flex-col gap-4">
+          {items.map((item, i) => (
+            <motion.div
+              key={item.productId}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ delay: i * 0.05 }}
+              className="glass rounded-2xl border border-white/6 p-4"
+            >
+              <div className="flex gap-4">
+                {/* Image */}
+                <Link href={`/product/${item.productId}`}>
+                  <div
+                    className="w-20 h-20 rounded-xl flex-shrink-0"
+                    style={{ background: item.product.images[0]?.url }}
+                  />
+                </Link>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <Link href={`/product/${item.productId}`}>
+                      <p className="text-sm font-semibold text-white hover:text-indigo-300 transition-colors line-clamp-2">
+                        {item.product.name}
+                      </p>
+                    </Link>
+                    <p className="text-base font-bold text-white flex-shrink-0">
+                      {formatCurrency(item.product.price * item.quantity)}
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3">{item.product.brand}</p>
+
+                  <div className="flex items-center gap-3">
+                    {/* Qty controls */}
+                    <div className="flex items-center gap-2 glass rounded-xl border border-white/10 px-3 py-1.5">
+                      <button
+                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                        className="text-slate-400 hover:text-white transition-colors"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span className="text-white text-sm font-medium w-6 text-center">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                        className="text-slate-400 hover:text-white transition-colors"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
+
+                    {/* Save for later */}
+                    <button
+                      onClick={() => {
+                        wishlistAdd(item.product);
+                        removeItem(item.productId);
+                      }}
+                      className="text-xs text-slate-500 hover:text-rose-400 flex items-center gap-1 transition-colors"
+                    >
+                      <Heart size={12} /> Save
+                    </button>
+
+                    {/* Remove */}
+                    <button
+                      onClick={() => removeItem(item.productId)}
+                      className="text-xs text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors ml-auto"
+                    >
+                      <Trash2 size={12} /> Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+
+          <Link href="/shop" className="text-sm text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-colors">
+            <ArrowLeft size={14} /> Continue Shopping
+          </Link>
+        </div>
+
+        {/* Summary */}
+        <div className="lg:w-80 flex-shrink-0">
+          <div className="glass rounded-2xl border border-white/8 p-6 sticky top-24">
+            <h3 className="font-semibold text-white text-lg mb-5">Order Summary</h3>
+
+            {/* Coupon */}
+            <div className="flex gap-2 mb-5">
+              <div className="relative flex-1">
+                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  placeholder="Coupon code"
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                />
+              </div>
+              <button className="h-9 px-3 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-sm hover:bg-indigo-500/30 transition-colors">
+                Apply
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 mb-5">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Subtotal</span>
+                <span className="text-white">{formatCurrency(subtotal)}</span>
+              </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Discount</span>
+                  <span className="text-emerald-400">-{formatCurrency(discount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Shipping</span>
+                <span className={shipping === 0 ? 'text-emerald-400' : 'text-white'}>
+                  {shipping === 0 ? 'Free' : formatCurrency(shipping)}
+                </span>
+              </div>
+              <div className="border-t border-white/8 pt-3 flex justify-between font-bold">
+                <span className="text-white">Total</span>
+                <span className="text-xl text-white">{formatCurrency(total)}</span>
+              </div>
+            </div>
+
+            <Link href="/checkout">
+              <Button fullWidth size="lg" rightIcon={<ArrowRight size={16} />}>
+                Proceed to Checkout
+              </Button>
+            </Link>
+
+            <p className="text-center text-xs text-slate-600 mt-4">
+              🔒 Secure checkout with SSL encryption
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,121 @@
+import type { Review, Testimonial } from '@/types';
+
+export const reviews: Review[] = [
+  {
+    id: 'rev-001',
+    productId: 'prod-001',
+    userId: 'user-001',
+    userName: 'Arjun Mehta',
+    userAvatar: undefined,
+    rating: 5,
+    title: 'Best headphones I have ever owned',
+    content:
+      'The sound quality is absolutely incredible. The ANC blocks out everything — office noise, traffic, everything. Battery lasts all day and then some. Highly recommend.',
+    date: '2026-09-14',
+    verified: true,
+    helpful: 142,
+  },
+  {
+    id: 'rev-002',
+    productId: 'prod-001',
+    userId: 'user-002',
+    userName: 'Priya Sharma',
+    rating: 4,
+    title: 'Great sound, slightly heavy',
+    content:
+      'The sound profile is lush and detailed. My only minor gripe is they feel a touch heavy during long sessions, but that is a small price for this audio quality.',
+    date: '2026-09-10',
+    verified: true,
+    helpful: 87,
+  },
+  {
+    id: 'rev-003',
+    productId: 'prod-002',
+    userId: 'user-003',
+    userName: 'Rohan Kapoor',
+    rating: 5,
+    title: 'Worth every rupee',
+    content:
+      'Tracks my workouts perfectly. The sleep data is super detailed. Love the AMOLED screen — sharp and vibrant even in direct sunlight. Battery easily lasts 6-7 days.',
+    date: '2026-09-05',
+    verified: true,
+    helpful: 213,
+  },
+  {
+    id: 'rev-004',
+    productId: 'prod-007',
+    userId: 'user-004',
+    userName: 'Sneha Patel',
+    rating: 5,
+    title: 'Beautifully crafted',
+    content:
+      'The leather is incredibly soft yet durable. Already developing a gorgeous patina. It holds everything I need without being bulky. A timeless purchase.',
+    date: '2026-08-22',
+    verified: true,
+    helpful: 98,
+  },
+  {
+    id: 'rev-005',
+    productId: 'prod-009',
+    userId: 'user-005',
+    userName: 'Vikram Nair',
+    rating: 5,
+    title: 'Desk upgrade complete',
+    content:
+      'This lamp transformed my workspace. The adaptive brightness is genuinely smart — it adjusts perfectly throughout the day. The wireless charging is fast and the USB hub is super handy.',
+    date: '2026-09-20',
+    verified: true,
+    helpful: 176,
+  },
+];
+
+export const testimonials: Testimonial[] = [
+  {
+    id: 'test-001',
+    name: 'Arjun Mehta',
+    location: 'Mumbai, India',
+    rating: 5,
+    text: 'The quality of products here is genuinely premium. My NovaPro headphones arrived beautifully packaged and sound incredible. Shopping experience was flawless — will definitely be back.',
+    date: '2026-09-18',
+  },
+  {
+    id: 'test-002',
+    name: 'Priya Sharma',
+    location: 'Bangalore, India',
+    rating: 5,
+    text: 'Ordered three things and all arrived two days early. The cashmere turtleneck is softer than anything I have owned before. Customer support was also really helpful when I had a size query.',
+    date: '2026-09-12',
+  },
+  {
+    id: 'test-003',
+    name: 'Rohan Kapoor',
+    location: 'Delhi, India',
+    rating: 5,
+    text: 'The smart watch exceeded my expectations. Detailed health tracking, gorgeous display, and the battery life is phenomenal. Return process for a different colour was painless too.',
+    date: '2026-09-08',
+  },
+  {
+    id: 'test-004',
+    name: 'Ananya Singh',
+    location: 'Hyderabad, India',
+    rating: 4,
+    text: 'Great selection of premium products at competitive prices. The GlowLab serum visibly improved my skin in 3 weeks. Packaging is eco-friendly too, which I appreciate.',
+    date: '2026-08-30',
+  },
+  {
+    id: 'test-005',
+    name: 'Vikram Nair',
+    location: 'Chennai, India',
+    rating: 5,
+    text: 'Bought the adjustable dumbbells and they are absolute game-changers for my home gym. Build quality is tank-solid and the quick-select mechanism works perfectly every single time.',
+    date: '2026-09-25',
+  },
+  {
+    id: 'test-006',
+    name: 'Meera Iyer',
+    location: 'Pune, India',
+    rating: 5,
+    text: 'This is hands-down the best online shopping experience I have had in India. Premium products, fast delivery, and a website that is actually beautiful to browse. Instant fan.',
+    date: '2026-09-22',
+  },
+];
