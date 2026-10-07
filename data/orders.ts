@@ -8,7 +8,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-001',
         productName: 'NovaPro X15 Wireless Headphones',
-        productImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        productImage: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
         variant: 'Midnight Black',
         quantity: 1,
         price: 8999,
@@ -17,7 +17,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-007',
         productName: 'Meridian Minimal Leather Wallet',
-        productImage: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
+        productImage: 'https://images.unsplash.com/photo-1627123424574-724758594785?w=800&q=80',
         variant: 'Tan',
         quantity: 1,
         price: 1499,
@@ -53,7 +53,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-002',
         productName: 'PixelView 4K Smart Watch Ultra',
-        productImage: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        productImage: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
         variant: 'Midnight Black',
         quantity: 1,
         price: 24999,
@@ -89,7 +89,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-009',
         productName: 'Aura Smart LED Desk Lamp',
-        productImage: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+        productImage: 'https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=800&q=80',
         quantity: 1,
         price: 3499,
         originalPrice: 4999,
@@ -97,7 +97,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-011',
         productName: 'GlowLab Vitamin C Serum Pro',
-        productImage: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+        productImage: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=800&q=80',
         quantity: 2,
         price: 1299,
         originalPrice: 1799,
@@ -131,7 +131,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-005',
         productName: 'UrbanEdge Slim-Fit Bomber Jacket',
-        productImage: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        productImage: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=800&q=80',
         variant: 'Jet Black / M',
         quantity: 1,
         price: 3999,

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingCart, Eye } from 'lucide-react';
@@ -18,6 +18,11 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, className, index = 0 }: ProductCardProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { addItem, isInCart } = useCart();
   const { toggleItem, isWishlisted } = useWishlist();
 
@@ -31,14 +36,20 @@ export default function ProductCard({ product, className, index = 0 }: ProductCa
       transition={{ duration: 0.4, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
       className={cn('group relative', className)}
     >
-      <div className="relative rounded-2xl bg-[#12121e] border border-white/6 overflow-hidden card-hover shine-effect">
+      <div className="relative rounded-2xl bg-[#12121e] border border-white/6 overflow-hidden card-hover shine-effect" suppressHydrationWarning>
         {/* Image Area */}
-        <Link href={`/product/${product.id}`} className="block relative aspect-square overflow-hidden">
-          {/* Gradient stand-in */}
-          <div
-            className="w-full h-full transition-transform duration-500 group-hover:scale-105"
-            style={{ background: product.images[0]?.url }}
-          />
+        <Link href={`/product/${product.id}`} className="block relative aspect-square overflow-hidden" suppressHydrationWarning>
+          {/* Product image */}
+          {mounted ? (
+            <img
+              src={product.images[0]?.url}
+              alt={product.images[0]?.alt ?? product.name}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              suppressHydrationWarning
+            />
+          ) : (
+            <div className="w-full h-full bg-[#181826]" />
+          )}
 
           {/* Overlay on hover */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">

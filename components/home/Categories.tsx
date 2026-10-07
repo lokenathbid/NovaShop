@@ -13,6 +13,11 @@ function CategoryCard({
   category: (typeof categories)[0];
   index: number;
 }) {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -23,12 +28,19 @@ function CategoryCard({
       <Link
         href={`/shop/${category.slug}`}
         className="group relative block rounded-2xl overflow-hidden aspect-[4/3] card-hover"
+        suppressHydrationWarning
       >
-        {/* Gradient background */}
-        <div
-          className="absolute inset-0 transition-transform duration-500 group-hover:scale-105"
-          style={{ background: category.image }}
-        />
+        {/* Category image */}
+        {mounted ? (
+          <img
+            src={category.image}
+            alt={category.name}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            suppressHydrationWarning
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[#181826]" />
+        )}
 
         {/* Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />

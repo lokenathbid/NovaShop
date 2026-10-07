@@ -179,9 +179,10 @@ export default function CheckoutPage() {
             <div className="flex flex-col gap-3 mb-5 max-h-64 overflow-y-auto pr-1">
               {items.map((item) => (
                 <div key={item.productId} className="flex items-center gap-3">
-                  <div
-                    className="w-12 h-12 rounded-lg flex-shrink-0"
-                    style={{ background: item.product.images[0]?.url }}
+                  <img
+                    src={item.product.images[0]?.url}
+                    alt={item.product.name}
+                    className="w-12 h-12 rounded-lg flex-shrink-0 object-cover"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-white line-clamp-1">{item.product.name}</p>

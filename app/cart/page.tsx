@@ -63,10 +63,12 @@ export default function CartPage() {
             >
               <div className="flex gap-4">
                 {/* Image */}
-                <Link href={`/product/${item.productId}`}>
-                  <div
-                    className="w-20 h-20 rounded-xl flex-shrink-0"
-                    style={{ background: item.product.images[0]?.url }}
+                <Link href={`/product/${item.productId}`} suppressHydrationWarning>
+                  <img
+                    src={item.product.images[0]?.url}
+                    alt={item.product.name}
+                    className="w-20 h-20 rounded-xl flex-shrink-0 object-cover"
+                    suppressHydrationWarning
                   />
                 </Link>
 

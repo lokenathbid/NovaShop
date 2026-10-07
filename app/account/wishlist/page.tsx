@@ -29,7 +29,7 @@ export default function AccountWishlistPage() {
             <div className="flex flex-col gap-3">
               {items.map((product) => (
                 <div key={product.id} className="glass rounded-2xl border border-white/8 p-4 flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: product.images[0]?.url }} />
+                  <img src={product.images[0]?.url} alt={product.name} className="w-16 h-16 rounded-xl flex-shrink-0 object-cover" />
                   <div className="flex-1 min-w-0">
                     <Link href={`/product/${product.id}`}>
                       <p className="text-sm font-semibold text-white hover:text-indigo-300 transition-colors line-clamp-1">{product.name}</p>

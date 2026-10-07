@@ -39,8 +39,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
-      <body className="font-sans antialiased bg-surface-950 text-slate-100 min-h-screen flex flex-col">
+    <html lang="en" className={`${inter.variable} ${outfit.variable}`} suppressHydrationWarning>
+      <body className="font-sans antialiased bg-surface-950 text-slate-100 min-h-screen flex flex-col" suppressHydrationWarning>
         <CartProvider>
           <WishlistProvider>
             <Navbar />

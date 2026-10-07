@@ -122,9 +122,10 @@ export default function Navbar() {
                                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/8 transition-colors group"
                                 onClick={() => setCategoriesOpen(false)}
                               >
-                                <div
-                                  className="w-8 h-8 rounded-lg flex-shrink-0"
-                                  style={{ background: cat.image }}
+                                <img
+                                  src={cat.image}
+                                  alt={cat.name}
+                                  className="w-8 h-8 rounded-lg flex-shrink-0 object-cover"
                                 />
                                 <div>
                                   <p className="text-sm font-medium text-white">{cat.name}</p>
@@ -270,9 +271,10 @@ export default function Navbar() {
                       href={`/shop/${cat.slug}`}
                       className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/8 transition-colors"
                     >
-                      <div
-                        className="w-7 h-7 rounded-lg flex-shrink-0"
-                        style={{ background: cat.image }}
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        className="w-7 h-7 rounded-lg flex-shrink-0 object-cover"
                       />
                       <span className="text-sm text-slate-300">{cat.name}</span>
                     </Link>

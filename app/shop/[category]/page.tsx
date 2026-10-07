@@ -30,10 +30,14 @@ export default function CategoryPage() {
       </Link>
 
       {/* Header */}
-      <div className="relative rounded-3xl overflow-hidden mb-10 p-8 sm:p-12"
-        style={{ background: category.image }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
+      <div className="relative rounded-3xl overflow-hidden mb-10 p-8 sm:p-12" suppressHydrationWarning>
+        <img
+          src={category.image}
+          alt={category.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          suppressHydrationWarning
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 to-black/35" />
         <div className="relative">
           <motion.h1
             initial={{ opacity: 0, y: 16 }}

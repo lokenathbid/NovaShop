@@ -121,9 +121,15 @@ export default function ProductPage() {
             initial={{ opacity: 0.6, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.25 }}
-            className="aspect-square rounded-2xl overflow-hidden mb-4 relative"
-            style={{ background: product.images[activeImage]?.url }}
+            className="aspect-square rounded-2xl overflow-hidden mb-4 relative bg-[#12121e]"
+            suppressHydrationWarning
           >
+            <img
+              src={product.images[activeImage]?.url}
+              alt={product.images[activeImage]?.alt ?? product.name}
+              className="w-full h-full object-cover"
+              suppressHydrationWarning
+            />
             {/* Badges */}
             <div className="absolute top-4 left-4 flex gap-2">
               {product.isNew && <Badge variant="new">New</Badge>}
@@ -135,16 +141,22 @@ export default function ProductPage() {
 
           {/* Thumbnails */}
           {product.images.length > 1 && (
-            <div className="flex gap-3">
+            <div className="flex gap-3" suppressHydrationWarning>
               {product.images.map((img, i) => (
                 <button
                   key={img.id}
                   onClick={() => setActiveImage(i)}
-                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                    i === activeImage ? 'border-indigo-500' : 'border-transparent opacity-50 hover:opacity-75'
+                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all relative ${
+                    i === activeImage ? 'border-indigo-500' : 'border-transparent opacity-60 hover:opacity-100'
                   }`}
+                  suppressHydrationWarning
                 >
-                  <div className="w-full h-full" style={{ background: img.url }} />
+                  <img
+                    src={img.url}
+                    alt={img.alt}
+                    className="w-full h-full object-cover"
+                    suppressHydrationWarning
+                  />
                 </button>
               ))}
             </div>

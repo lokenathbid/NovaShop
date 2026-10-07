@@ -45,10 +45,12 @@ export default function WishlistPage() {
             transition={{ delay: i * 0.05 }}
             className="relative rounded-2xl bg-[#12121e] border border-white/6 overflow-hidden group"
           >
-            <Link href={`/product/${product.id}`} className="block aspect-square overflow-hidden">
-              <div
-                className="w-full h-full transition-transform duration-500 group-hover:scale-105"
-                style={{ background: product.images[0]?.url }}
+            <Link href={`/product/${product.id}`} className="block aspect-square overflow-hidden" suppressHydrationWarning>
+              <img
+                src={product.images[0]?.url}
+                alt={product.images[0]?.alt ?? product.name}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                suppressHydrationWarning
               />
             </Link>
 

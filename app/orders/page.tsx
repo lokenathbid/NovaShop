@@ -68,9 +68,10 @@ export default function OrdersPage() {
                     key={item.productId}
                     className="flex-shrink-0 flex items-center gap-2"
                   >
-                    <div
-                      className="w-12 h-12 rounded-xl"
-                      style={{ background: item.productImage }}
+                    <img
+                      src={item.productImage}
+                      alt={item.productName}
+                      className="w-12 h-12 rounded-xl object-cover"
                     />
                     <div>
                       <p className="text-xs text-white line-clamp-1 max-w-[120px]">{item.productName}</p>

@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String?
+  phone     String?
+  avatar    String?
+  role      String    @default("customer")
+  addresses Address[]
+  orders    Order[]
+  reviews   Review[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Address {
+  id           String  @id @default(cuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label        String  @default("Home")
+  fullName     String
+  phone        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  zipCode      String
+  country      String  @default("India")
+  isDefault    Boolean @default(false)
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?   @db.Text
+  image       String?
+  featured    Boolean   @default(false)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id                 String                 @id @default(cuid())
+  name               String
+  slug               String                 @unique
+  categorySlug       String
+  category           Category               @relation(fields: [categorySlug], references: [slug], onDelete: Cascade)
+  brand              String
+  shortDescription   String                 @db.Text
+  description        String                 @db.Text
+  price              Float
+  originalPrice      Float?
+  discountPercentage Int?
+  rating             Float                  @default(0)
+  reviewCount        Int                    @default(0)
+  inStock            Boolean                @default(true)
+  stockCount         Int                    @default(100)
+  isFeatured         Boolean                @default(false)
+  isNew              Boolean                @default(false)
+  isBestseller       Boolean                @default(false)
+  isTrending         Boolean                @default(false)
+  tags               String                 @default("")
+  shippingInfo       String?
+  returnInfo         String?
+  images             ProductImage[]
+  variants           ProductVariant[]
+  specifications     ProductSpecification[]
+  reviews            Review[]
+  orderItems         OrderItem[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String  @db.Text
+  alt       String
+}
+
+model ProductVariant {
+  id            String  @id @default(cuid())
+  productId     String
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String
+  value         String
+  type          String
+  inStock       Boolean @default(true)
+  priceModifier Float?  @default(0)
+}
+
+model ProductSpecification {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  value     String
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName   String
+  userAvatar String?
+  rating     Float
+  title      String
+  content    String   @db.Text
+  verified   Boolean  @default(true)
+  helpful    Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            String      @default("processing")
+  paymentStatus     String      @default("pending")
+  paymentMethod     String      @default("card")
+  shippingAddress   Json
+  subtotal          Float
+  discount          Float       @default(0)
+  shipping          Float       @default(0)
+  total             Float
+  estimatedDelivery DateTime?
+  trackingNumber    String?
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productName   String
+  productImage  String  @db.Text
+  variant       String?
+  quantity      Int
+  price         Float
+  originalPrice Float?
+}

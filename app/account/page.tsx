@@ -78,7 +78,7 @@ export default function AccountPage() {
                   href={`/orders/${order.id}`}
                   className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: order.items[0]?.productImage }} />
+                  <img src={order.items[0]?.productImage} alt={order.id} className="w-10 h-10 rounded-xl flex-shrink-0 object-cover" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white">{order.id}</p>
                     <p className="text-xs text-slate-500">{formatDate(order.createdAt)}</p>

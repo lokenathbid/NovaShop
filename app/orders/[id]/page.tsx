@@ -184,7 +184,7 @@ export default function OrderDetailPage() {
         <div className="flex flex-col gap-3">
           {order.items.map((item) => (
             <div key={item.productId} className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: item.productImage }} />
+              <img src={item.productImage} alt={item.productName} className="w-16 h-16 rounded-xl flex-shrink-0 object-cover" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white line-clamp-1">{item.productName}</p>
                 {item.variant && <p className="text-xs text-slate-500">{item.variant}</p>}
