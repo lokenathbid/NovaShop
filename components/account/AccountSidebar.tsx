@@ -3,7 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, MapPin, Heart, Settings, Package, ChevronRight } from 'lucide-react';
+import { signOut } from 'next-auth/react';
+import { User, MapPin, Heart, Settings, Package, ChevronRight, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const links = [
@@ -40,7 +41,18 @@ export default function AccountSidebar() {
             </Link>
           );
         })}
+
+        <div className="pt-2 mt-2 border-t border-white/8">
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer text-left"
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
+        </div>
       </div>
     </aside>
   );
 }
+
