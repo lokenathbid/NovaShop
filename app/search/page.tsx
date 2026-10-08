@@ -1,20 +1,51 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, X } from 'lucide-react';
-import { products, searchProducts } from '@/data/products';
+import { Search, X, Loader2, AlertCircle } from 'lucide-react';
 import ProductGrid from '@/components/product/ProductGrid';
+import type { Product } from '@/types';
 
 const recentSearches = ['headphones', 'yoga mat', 'leather wallet', 'smart watch'];
 const suggestions = ['Electronics', 'Fashion', 'Cashmere', 'Sunglasses', 'Dumbbells', 'Serum'];
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
+  const [results, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    return searchProducts(query);
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setProducts([]);
+      setLoading(false);
+      setHasSearched(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(trimmed)}&limit=24`);
+        if (!res.ok) {
+          throw new Error('Search failed');
+        }
+        const data = await res.json();
+        setProducts(data.products || []);
+        setHasSearched(true);
+      } catch (err) {
+        console.error('Search error:', err);
+        setError('Unable to perform search right now. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
   const hasQuery = query.trim().length > 0;
@@ -42,7 +73,7 @@ export default function SearchPage() {
         {query && (
           <button
             onClick={() => setQuery('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer"
             aria-label="Clear search"
           >
             <X size={18} />
@@ -60,7 +91,7 @@ export default function SearchPage() {
                 <button
                   key={s}
                   onClick={() => setQuery(s)}
-                  className="px-4 py-2 rounded-xl glass border border-white/10 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all"
+                  className="px-4 py-2 rounded-xl glass border border-white/10 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all cursor-pointer"
                 >
                   {s}
                 </button>
@@ -74,7 +105,7 @@ export default function SearchPage() {
                 <button
                   key={s}
                   onClick={() => setQuery(s)}
-                  className="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-sm text-indigo-300 hover:bg-indigo-500/20 transition-all"
+                  className="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-sm text-indigo-300 hover:bg-indigo-500/20 transition-all cursor-pointer"
                 >
                   {s}
                 </button>
@@ -84,16 +115,35 @@ export default function SearchPage() {
         </div>
       )}
 
+      {/* Error state */}
+      {error && (
+        <div className="glass rounded-2xl border border-red-500/20 p-6 flex items-center gap-3 text-red-400 mb-6">
+          <AlertCircle size={20} className="flex-shrink-0" />
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Loading indicator */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+          <Loader2 size={32} className="animate-spin text-indigo-400 mb-3" />
+          <p className="text-sm">Searching the catalog...</p>
+        </div>
+      )}
+
       {/* Results */}
-      {hasQuery && (
+      {!loading && hasQuery && hasSearched && (
         <div>
           <p className="text-sm text-slate-400 mb-5">
-            {results.length} result{results.length !== 1 ? 's' : ''} for &ldquo;<span className="text-white">{query}</span>&rdquo;
+            {results.length} result{results.length !== 1 ? 's' : ''} for &ldquo;
+            <span className="text-white font-medium">{query}</span>&rdquo;
           </p>
           {results.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-slate-400 text-lg mb-2">No results found</p>
-              <p className="text-slate-600 text-sm">Try a different search term or browse by category.</p>
+            <div className="glass rounded-2xl border border-white/8 text-center py-16 p-6">
+              <p className="text-slate-300 text-lg font-medium mb-1">No products found</p>
+              <p className="text-slate-500 text-sm">
+                Try searching for broader terms, brand names, or check your spelling.
+              </p>
             </div>
           ) : (
             <ProductGrid products={results} />
