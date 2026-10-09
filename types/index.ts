@@ -151,10 +151,22 @@ export interface User {
 // ─── Cart Types ───────────────────────────────────────────────────────────────
 
 export interface CartItem {
+  id?: string;
   productId: string;
   product: Product;
   quantity: number;
+  variant?: string | null;
   selectedVariants?: Record<string, string>;
+}
+
+export interface Cart {
+  id?: string;
+  items: CartItem[];
+  itemCount: number;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  total: number;
 }
 
 // ─── UI Utility Types ─────────────────────────────────────────────────────────

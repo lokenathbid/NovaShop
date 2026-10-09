@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingCart, Eye } from 'lucide-react';
+import { Heart, ShoppingCart, Eye, Loader2 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import type { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -23,10 +23,11 @@ export default function ProductCard({ product, className, index = 0 }: ProductCa
     setMounted(true);
   }, []);
 
-  const { addItem, isInCart } = useCart();
+  const { addItem, isInCart, isItemPending } = useCart();
   const { toggleItem, isWishlisted } = useWishlist();
 
   const inCart = isInCart(product.id);
+  const pending = isItemPending(product.id);
   const wishlisted = isWishlisted(product.id);
 
   return (
@@ -123,17 +124,27 @@ export default function ProductCard({ product, className, index = 0 }: ProductCa
             <div className="text-xs text-red-400 font-medium py-1">Out of Stock</div>
           ) : (
             <button
+              disabled={pending}
               onClick={() => addItem(product)}
               aria-label={`Add ${product.name} to cart`}
               className={cn(
-                'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer disabled:opacity-50',
                 inCart
                   ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                   : 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-lg shadow-indigo-500/20',
               )}
             >
-              <ShoppingCart size={15} />
-              {inCart ? 'In Cart' : 'Add to Cart'}
+              {pending ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Adding...</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingCart size={15} />
+                  <span>{inCart ? 'In Cart' : 'Add to Cart'}</span>
+                </>
+              )}
             </button>
           )}
         </div>

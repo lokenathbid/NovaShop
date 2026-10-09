@@ -80,7 +80,7 @@ export default function ProductPage() {
   const [notFoundState, setNotFoundState] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { addItem, isInCart } = useCart();
+  const { addItem, isInCart, isItemPending } = useCart();
   const { toggleItem, isWishlisted } = useWishlist();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
@@ -193,13 +193,16 @@ export default function ProductPage() {
   }
 
   const inCart = isInCart(product.id);
+  const pending = isItemPending(product.id);
   const wishlisted = isWishlisted(product.id);
   const productReviews = product.reviews || [];
 
-  const handleAddToCart = () => {
-    addItem(product, quantity, selectedVariants);
-    setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2000);
+  const handleAddToCart = async () => {
+    const success = await addItem(product, quantity, selectedVariants);
+    if (success) {
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 2000);
+    }
   };
 
   // Group variants by type
@@ -362,7 +365,13 @@ export default function ProductPage() {
               </button>
               <span className="text-white font-medium w-8 text-center">{quantity}</span>
               <button
-                onClick={() => setQuantity((q) => q + 1)}
+                onClick={() =>
+                  setQuantity((q) =>
+                    product.stockCount !== null && product.stockCount !== undefined
+                      ? Math.min(product.stockCount, q + 1)
+                      : q + 1
+                  )
+                }
                 aria-label="Increase quantity"
                 className="text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
@@ -377,13 +386,28 @@ export default function ProductPage() {
           {/* Actions */}
           <div className="flex gap-3 mb-6">
             <Button
+              disabled={pending || !product.inStock}
               onClick={handleAddToCart}
-              leftIcon={addedToCart ? <Check size={18} /> : <ShoppingCart size={18} />}
+              leftIcon={
+                pending ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : addedToCart ? (
+                  <Check size={18} />
+                ) : (
+                  <ShoppingCart size={18} />
+                )
+              }
               fullWidth
               variant={addedToCart ? 'secondary' : 'primary'}
               size="lg"
             >
-              {addedToCart ? 'Added!' : inCart ? 'In Cart' : 'Add to Cart'}
+              {pending
+                ? 'Adding...'
+                : addedToCart
+                ? 'Added!'
+                : inCart
+                ? 'In Cart'
+                : 'Add to Cart'}
             </Button>
             <Link href="/checkout" className="flex-1">
               <Button variant="accent" size="lg" fullWidth leftIcon={<Zap size={18} />}>

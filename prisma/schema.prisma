@@ -21,6 +21,7 @@ model User {
   addresses Address[]
   orders    Order[]
   reviews   Review[]
+  cart      Cart?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -81,6 +82,7 @@ model Product {
   specifications     ProductSpecification[]
   reviews            Review[]
   orderItems         OrderItem[]
+  cartItems          CartItem[]
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 }
@@ -169,5 +171,32 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+model CartItem {
+  id               String   @id @default(cuid())
+  cartId           String
+  cart             Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity         Int      @default(1)
+  variant          String?
+  selectedVariants Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([cartId])
+  @@index([productId])
 }
 
