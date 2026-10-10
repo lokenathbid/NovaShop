@@ -81,7 +81,7 @@ export default function ProductPage() {
   const [error, setError] = useState<string | null>(null);
 
   const { addItem, isInCart, isItemPending } = useCart();
-  const { toggleItem, isWishlisted } = useWishlist();
+  const { toggleItem, isWishlisted, isItemPending: isWishlistPending } = useWishlist();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
@@ -415,9 +415,11 @@ export default function ProductPage() {
               </Button>
             </Link>
             <button
+              disabled={isWishlistPending(product.id)}
               onClick={() => toggleItem(product)}
-              aria-label="Wishlist"
-              className={`flex-shrink-0 p-3 rounded-xl border transition-all cursor-pointer ${
+              aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              title={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              className={`flex-shrink-0 p-3 rounded-xl border transition-all cursor-pointer disabled:opacity-40 ${
                 wishlisted
                   ? 'border-rose-500/40 bg-rose-500/15 text-rose-400'
                   : 'border-white/10 bg-white/5 text-slate-400 hover:text-rose-400 hover:border-rose-500/30'

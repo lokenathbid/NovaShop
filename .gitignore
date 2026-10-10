@@ -20,15 +20,30 @@
 # production
 /build
 
-# misc
+# misc & OS
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 *.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
 
-# debug
+# debug & logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # env files
 .env*

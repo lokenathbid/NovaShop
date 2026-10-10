@@ -39,7 +39,7 @@ interface CartContextValue {
   showNotification: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-const CartContext = createContext<CartContextValue | null>(null);
+export const CartContext = createContext<CartContextValue | null>(null);
 
 const STORAGE_KEY = 'ecom_cart';
 

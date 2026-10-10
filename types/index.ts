@@ -169,6 +169,16 @@ export interface Cart {
   total: number;
 }
 
+// ─── Wishlist Types ───────────────────────────────────────────────────────────
+
+export interface WishlistItem {
+  id: string;
+  userId: string;
+  productId: string;
+  product?: Product;
+  createdAt?: string;
+}
+
 // ─── UI Utility Types ─────────────────────────────────────────────────────────
 
 export type SortOption =

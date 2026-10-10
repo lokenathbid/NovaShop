@@ -24,11 +24,20 @@ export default function ProductCard({ product, className, index = 0 }: ProductCa
   }, []);
 
   const { addItem, isInCart, isItemPending } = useCart();
-  const { toggleItem, isWishlisted } = useWishlist();
+  const { toggleItem, isWishlisted, isItemPending: isWishlistPending } = useWishlist();
 
   const inCart = isInCart(product.id);
   const pending = isItemPending(product.id);
   const wishlisted = isWishlisted(product.id);
+  const wishlistPending = isWishlistPending(product.id);
+
+  const [imgSrc, setImgSrc] = useState<string>(product.images?.[0]?.url || '');
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgSrc(product.images?.[0]?.url || '');
+    setImgError(false);
+  }, [product.images]);
 
   return (
     <motion.div
@@ -39,13 +48,20 @@ export default function ProductCard({ product, className, index = 0 }: ProductCa
     >
       <div className="relative rounded-2xl bg-[#12121e] border border-white/6 overflow-hidden card-hover shine-effect" suppressHydrationWarning>
         {/* Image Area */}
-        <Link href={`/product/${product.id}`} className="block relative aspect-square overflow-hidden" suppressHydrationWarning>
+        <Link href={`/product/${product.id}`} className="block relative aspect-square overflow-hidden bg-[#181826]" suppressHydrationWarning>
           {/* Product image */}
           {mounted ? (
             <img
-              src={product.images[0]?.url}
-              alt={product.images[0]?.alt ?? product.name}
+              src={imgError ? (product.images?.[1]?.url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80') : (imgSrc || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80')}
+              alt={product.images?.[0]?.alt ?? product.name}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              onError={() => {
+                if (!imgError && product.images?.[1]?.url) {
+                  setImgSrc(product.images[1].url);
+                } else {
+                  setImgError(true);
+                }
+              }}
               suppressHydrationWarning
             />
           ) : (
@@ -77,8 +93,10 @@ export default function ProductCard({ product, className, index = 0 }: ProductCa
 
           {/* Wishlist button */}
           <button
+            disabled={wishlistPending}
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               toggleItem(product);
             }}
             aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}

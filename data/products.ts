@@ -120,7 +120,7 @@ export const products: Product[] = [
     shortDescription: 'Dolby Atmos soundbar with wireless subwoofer for cinematic audio.',
     description:
       'Fill your room with rich, three-dimensional sound. The SoundBar X9 delivers 300W of total power, supports Dolby Atmos and DTS:X, and pairs effortlessly with its wireless subwoofer for earth-shaking bass. HDMI eARC, optical, and Bluetooth connectivity cover every source.',
-    images: IMG(['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80','https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800&q=80','https://images.unsplash.com/photo-1563884072595-01adcf975f3e?w=800&q=80'], 'SoundBar X9 Home Theater'),
+    images: IMG(['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80','https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800&q=80','https://images.unsplash.com/photo-1558089687-f282ffcbc126?w=800&q=80'], 'SoundBar X9 Home Theater'),
     price: 19999,
     originalPrice: 27999,
     discountPercentage: 29,
@@ -212,7 +212,7 @@ export const products: Product[] = [
     shortDescription: 'RFID-blocking slim wallet in full-grain vegetable-tanned leather.',
     description:
       'The Meridian Wallet is hand-stitched from full-grain vegetable-tanned leather that develops a beautiful patina over time. Slim enough for any pocket, it holds up to 6 cards plus notes, and features built-in RFID blocking to keep your data secure.',
-    images: IMG(['https://images.unsplash.com/photo-1627123424574-724758594785?w=800&q=80','https://images.unsplash.com/photo-1606503153255-59d8b8b82176?w=800&q=80','https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80'], 'Meridian Minimal Leather Wallet'),
+    images: IMG(['https://images.unsplash.com/photo-1606503153255-59d8b8b82176?w=800&q=80','https://images.unsplash.com/photo-1559563458-527698bf5295?w=800&q=80','https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80'], 'Meridian Minimal Leather Wallet'),
     price: 1499,
     originalPrice: 2499,
     discountPercentage: 40,
@@ -240,7 +240,7 @@ export const products: Product[] = [
     shortDescription: 'Ultralight titanium frames with UV400 polarised lenses.',
     description:
       'Helio Sunglasses feature aerospace-grade titanium frames weighing just 18g, making them virtually weightless. Polarised UV400 lenses eliminate glare while providing 100% UV protection. A flexible spring hinge ensures a perfect fit for any face shape.',
-    images: IMG(['https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=800&q=80','https://images.unsplash.com/photo-1473496169904-658ba7574b0d?w=800&q=80','https://images.unsplash.com/photo-1508296695146-257a814070b4?w=800&q=80'], 'Helio Titanium Sunglasses'),
+    images: IMG(['https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=800&q=80','https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=800&q=80','https://images.unsplash.com/photo-1508296695146-257a814070b4?w=800&q=80'], 'Helio Titanium Sunglasses'),
     price: 4999,
     originalPrice: 6999,
     discountPercentage: 29,
@@ -330,7 +330,7 @@ export const products: Product[] = [
     shortDescription: '20% Vitamin C + Hyaluronic Acid for radiant, youthful skin.',
     description:
       'Formulated with stabilised 20% L-Ascorbic Acid, the GlowLab Vitamin C Serum Pro brightens, firms, and protects your skin. Combined with hyaluronic acid for deep hydration and ferulic acid for antioxidant synergy, this serum visibly reduces dark spots in 4 weeks.',
-    images: IMG(['https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=800&q=80','https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=800&q=80','https://images.unsplash.com/photo-1570194065650-d99fb4d8b09a?w=800&q=80'], 'GlowLab Vitamin C Serum Pro'),
+    images: IMG(['https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=800&q=80','https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=800&q=80','https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&q=80'], 'GlowLab Vitamin C Serum Pro'),
     price: 1299,
     originalPrice: 1799,
     discountPercentage: 28,
@@ -353,7 +353,7 @@ export const products: Product[] = [
     shortDescription: '2400W professional ionic dryer for salon-quality blowouts.',
     description:
       'The ArcBlaze Ionic Hair Dryer Pro delivers a 2400W motor and negative ion technology to reduce frizz and enhance shine. Its lightweight, ergonomic handle and 3-heat/2-speed settings ensure comfortable, fast drying while protecting hair from heat damage.',
-    images: IMG(['https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=800&q=80','https://images.unsplash.com/photo-1630340238843-9a11bf6a5a5a?w=800&q=80','https://images.unsplash.com/photo-1527799820374-87776dcd5570?w=800&q=80'], 'ArcBlaze Ionic Hair Dryer Pro'),
+    images: IMG(['https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=800&q=80','https://images.unsplash.com/photo-1585751119414-ef2636f8aede?w=800&q=80','https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=800&q=80'], 'ArcBlaze Ionic Hair Dryer Pro'),
     price: 2999,
     originalPrice: 4499,
     discountPercentage: 33,
@@ -462,7 +462,7 @@ export const products: Product[] = [
     shortDescription: '500ml USB-C rechargeable blender with 6 stainless steel blades.',
     description:
       'Take your nutrition on the go with the AeroPlus Portable Blender. Its 500ml BPA-free Tritan jar houses 6 stainless-steel blades powered by a 150W motor. USB-C rechargeable with 25 blending cycles per charge, it crushes ice, frozen fruit, and protein powder with ease.',
-    images: IMG(['https://images.unsplash.com/photo-1570222094114-d054a817e56b?w=800&q=80','https://images.unsplash.com/photo-1612187951501-9ddddfaa5bf5?w=800&q=80','https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&q=80'], 'AeroPlus Portable Blender'),
+    images: IMG(['https://images.unsplash.com/photo-1570222094114-d054a817e56b?w=800&q=80','https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=800&q=80','https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&q=80'], 'AeroPlus Portable Blender'),
     price: 1999,
     originalPrice: 2999,
     discountPercentage: 33,

@@ -4,7 +4,18 @@ import { getUserCartWithDetails } from '../lib/cart';
 async function runTests() {
   console.log('--- Starting NovaShop Part 4 Cart Verification ---\n');
 
-  const user1 = await prisma.user.findFirst({ where: { email: 'bidlokenath@gmail.com' } });
+  let user1 = await prisma.user.findFirst({
+    where: { role: 'customer', NOT: { email: 'reviewer@novashop.com' } },
+  });
+  if (!user1) {
+    user1 = await prisma.user.create({
+      data: {
+        name: 'Test Customer',
+        email: 'customer@novashop.com',
+        role: 'customer',
+      },
+    });
+  }
   const user2 = await prisma.user.findFirst({ where: { email: 'reviewer@novashop.com' } });
 
   if (!user1 || !user2) {
