@@ -132,10 +132,17 @@ export interface Order {
 
 // ─── User / Account Types ─────────────────────────────────────────────────────
 
+export type AddressType = 'Home' | 'Work' | 'Other';
+
 export interface Address extends ShippingAddress {
   id: string;
+  userId?: string;
+  type?: string;
   label: string;
+  landmark?: string | null;
   isDefault: boolean;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface User {

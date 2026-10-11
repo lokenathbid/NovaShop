@@ -17,7 +17,7 @@ export const orders: Order[] = [
       {
         productId: 'prod-007',
         productName: 'Meridian Minimal Leather Wallet',
-        productImage: 'https://images.unsplash.com/photo-1627123424574-724758594785?w=800&q=80',
+        productImage: 'https://images.unsplash.com/photo-1606503153255-59d8b8b82176?w=800&q=80',
         variant: 'Tan',
         quantity: 1,
         price: 1499,

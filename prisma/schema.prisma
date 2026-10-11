@@ -28,19 +28,25 @@ model User {
 }
 
 model Address {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   userId       String
-  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label        String  @default("Home")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   @default("Home")
+  label        String   @default("Home")
   fullName     String
   phone        String
   addressLine1 String
   addressLine2 String?
+  landmark     String?
   city         String
   state        String
   zipCode      String
-  country      String  @default("India")
-  isDefault    Boolean @default(false)
+  country      String   @default("India")
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Category {

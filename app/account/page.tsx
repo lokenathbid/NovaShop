@@ -10,11 +10,13 @@ import AccountSidebar from '@/components/account/AccountSidebar';
 
 interface DbAddress {
   id: string;
+  type?: string;
   label: string;
   fullName: string;
   phone: string;
   addressLine1: string;
   addressLine2?: string | null;
+  landmark?: string | null;
   city: string;
   state: string;
   zipCode: string;

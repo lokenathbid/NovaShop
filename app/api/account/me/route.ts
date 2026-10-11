@@ -23,18 +23,23 @@ export async function GET() {
         role: true,
         createdAt: true,
         addresses: {
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
           select: {
             id: true,
+            type: true,
             label: true,
             fullName: true,
             phone: true,
             addressLine1: true,
             addressLine2: true,
+            landmark: true,
             city: true,
             state: true,
             zipCode: true,
             country: true,
             isDefault: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
         orders: {

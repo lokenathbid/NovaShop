@@ -22,6 +22,27 @@ const statusConfig: Record<
   returned: { label: 'Returned', variant: 'ghost' },
 };
 
+function OrderItemThumb({ src, alt }: { src: string; alt: string }) {
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-white/10 flex items-center justify-center text-indigo-400 flex-shrink-0">
+        <Package size={20} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className="w-12 h-12 rounded-xl object-cover bg-white/5 border border-white/10 flex-shrink-0"
+    />
+  );
+}
+
 export default function OrdersPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -68,11 +89,7 @@ export default function OrdersPage() {
                     key={item.productId}
                     className="flex-shrink-0 flex items-center gap-2"
                   >
-                    <img
-                      src={item.productImage}
-                      alt={item.productName}
-                      className="w-12 h-12 rounded-xl object-cover"
-                    />
+                    <OrderItemThumb src={item.productImage} alt={item.productName} />
                     <div>
                       <p className="text-xs text-white line-clamp-1 max-w-[120px]">{item.productName}</p>
                       <p className="text-xs text-slate-500">Qty: {item.quantity}</p>

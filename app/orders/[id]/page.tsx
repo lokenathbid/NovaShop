@@ -40,6 +40,27 @@ const statusVariant: Record<OrderStatus, 'primary' | 'accent' | 'success' | 'war
   returned: 'ghost',
 };
 
+function OrderItemDetailThumb({ src, alt }: { src: string; alt: string }) {
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div className="w-16 h-16 rounded-xl bg-indigo-500/10 border border-white/10 flex items-center justify-center text-indigo-400 flex-shrink-0">
+        <Package size={24} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className="w-16 h-16 rounded-xl flex-shrink-0 object-cover bg-white/5 border border-white/10"
+    />
+  );
+}
+
 export default function OrderDetailPage() {
   const params = useParams();
   const id = typeof params.id === 'string' ? params.id : '';
@@ -184,7 +205,7 @@ export default function OrderDetailPage() {
         <div className="flex flex-col gap-3">
           {order.items.map((item) => (
             <div key={item.productId} className="flex items-center gap-4">
-              <img src={item.productImage} alt={item.productName} className="w-16 h-16 rounded-xl flex-shrink-0 object-cover" />
+              <OrderItemDetailThumb src={item.productImage} alt={item.productName} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white line-clamp-1">{item.productName}</p>
                 {item.variant && <p className="text-xs text-slate-500">{item.variant}</p>}
