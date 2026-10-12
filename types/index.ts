@@ -79,6 +79,7 @@ export interface Review {
 // ─── Order Types ──────────────────────────────────────────────────────────────
 
 export type OrderStatus =
+  | 'pending'
   | 'processing'
   | 'confirmed'
   | 'shipped'
@@ -87,25 +88,28 @@ export type OrderStatus =
   | 'cancelled'
   | 'returned';
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'unpaid' | 'paid' | 'failed' | 'refunded';
 
 export type PaymentMethod = 'card' | 'upi' | 'cod' | 'netbanking' | 'wallet';
 
 export interface OrderItem {
+  id?: string;
+  orderId?: string;
   productId: string;
   productName: string;
   productImage: string;
-  variant?: string;
+  variant?: string | null;
   quantity: number;
   price: number;
-  originalPrice?: number;
+  originalPrice?: number | null;
 }
 
 export interface ShippingAddress {
   fullName: string;
   phone: string;
   addressLine1: string;
-  addressLine2?: string;
+  addressLine2?: string | null;
+  landmark?: string | null;
   city: string;
   state: string;
   zipCode: string;
@@ -123,11 +127,13 @@ export interface Order {
   subtotal: number;
   discount: number;
   shipping: number;
+  tax?: number;
   total: number;
+  idempotencyKey?: string | null;
   createdAt: string;
   updatedAt: string;
-  estimatedDelivery?: string;
-  trackingNumber?: string;
+  estimatedDelivery?: string | null;
+  trackingNumber?: string | null;
 }
 
 // ─── User / Account Types ─────────────────────────────────────────────────────

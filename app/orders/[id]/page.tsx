@@ -1,14 +1,29 @@
 'use client';
 
-import React from 'react';
-import { useParams, notFound } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, CreditCard, Check, Package, Truck, Home, Clock } from 'lucide-react';
-import { getOrderById } from '@/data/orders';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeft,
+  MapPin,
+  CreditCard,
+  Check,
+  Package,
+  Truck,
+  Home,
+  Clock,
+  Loader2,
+  AlertCircle,
+  RotateCcw,
+  CheckCircle,
+  XCircle,
+  ShieldCheck,
+} from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import type { OrderStatus } from '@/types';
+import type { Order, OrderStatus } from '@/types';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 
 const TIMELINE_STEPS: { status: OrderStatus; label: string; icon: React.ElementType }[] = [
   { status: 'processing', label: 'Order Placed', icon: Package },
@@ -30,7 +45,11 @@ function getStepIndex(status: OrderStatus): number {
   return STATUS_ORDER.indexOf(status);
 }
 
-const statusVariant: Record<OrderStatus, 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'ghost'> = {
+const statusVariant: Record<
+  OrderStatus,
+  'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'ghost'
+> = {
+  pending: 'warning',
   processing: 'warning',
   confirmed: 'primary',
   shipped: 'accent',
@@ -41,7 +60,7 @@ const statusVariant: Record<OrderStatus, 'primary' | 'accent' | 'success' | 'war
 };
 
 function OrderItemDetailThumb({ src, alt }: { src: string; alt: string }) {
-  const [hasError, setHasError] = React.useState(false);
+  const [hasError, setHasError] = useState(false);
 
   if (hasError || !src) {
     return (
@@ -63,46 +82,202 @@ function OrderItemDetailThumb({ src, alt }: { src: string; alt: string }) {
 
 export default function OrderDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = typeof params.id === 'string' ? params.id : '';
-  const order = getOrderById(id);
+  const isNewlyConfirmed = searchParams.get('confirmed') === 'true';
 
-  if (!order) notFound();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cancellation state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchOrder() {
+      if (!id) return;
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`/api/orders/${id}`);
+        if (!res.ok) {
+          if (res.status === 401) {
+            window.location.href = `/login?callbackUrl=/orders/${id}`;
+            return;
+          }
+          if (res.status === 404 || res.status === 403) {
+            throw new Error('Order not found or you do not have permission to view it.');
+          }
+          throw new Error('Failed to load order details.');
+        }
+        const data = await res.json();
+        if (isMounted) {
+          setOrder(data.order);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err?.message || 'Could not load order details.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchOrder();
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  const handleCancel = async () => {
+    if (!order) return;
+    try {
+      setCancelling(true);
+      setCancelError(null);
+
+      const res = await fetch(`/api/orders/${order.id}/cancel`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to cancel order.');
+      }
+
+      setOrder(data.order);
+      setShowCancelModal(false);
+    } catch (err: any) {
+      setCancelError(err?.message || 'Failed to cancel order.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20 flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-indigo-400 mb-3" size={36} />
+        <p className="text-slate-400 text-sm">Retrieving order details...</p>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <div className="glass rounded-3xl border border-white/8 p-8 sm:p-12">
+          <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
+          <h2 className="font-display text-2xl font-bold text-white mb-2">Order Not Available</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            {error || 'This order does not exist or you do not have permission to view it.'}
+          </p>
+          <Link href="/orders">
+            <Button leftIcon={<ArrowLeft size={16} />}>Back to My Orders</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const currentStep = getStepIndex(order.status);
   const isCancelled = order.status === 'cancelled' || order.status === 'returned';
+  const isCancellable = ['pending', 'processing', 'confirmed'].includes(order.status);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-      <Link
-        href="/orders"
-        className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-8 transition-colors"
-      >
-        <ArrowLeft size={16} /> Back to Orders
-      </Link>
+      {/* Celebration Banner for New Orders */}
+      <AnimatePresence>
+        {isNewlyConfirmed && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-indigo-500/20 to-emerald-500/20 border border-emerald-500/30 flex items-start gap-4"
+          >
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+              <CheckCircle size={28} />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-display text-xl font-bold text-white mb-1">
+                Order Placed Successfully!
+              </h2>
+              <p className="text-slate-300 text-sm">
+                Thank you for shopping with NovaShop. Your order has been placed with database-verified prices and inventory reservation.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex items-center justify-between mb-8">
+        <Link
+          href="/orders"
+          className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={16} /> Back to Orders
+        </Link>
+
+        {isCancellable && (
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setShowCancelModal(true)}
+            leftIcon={<RotateCcw size={14} />}
+          >
+            Cancel Order
+          </Button>
+        )}
+      </div>
 
       <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">{order.id}</h1>
+          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+            Order Identifier
+          </span>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-white mb-1">
+            {order.id}
+          </h1>
           <p className="text-slate-400 text-sm">Placed on {formatDate(order.createdAt)}</p>
         </div>
-        <Badge variant={statusVariant[order.status]}>
-          {order.status.replace(/_/g, ' ')}
-        </Badge>
+        <div className="flex flex-col items-end gap-1.5">
+          <Badge variant={statusVariant[order.status]}>
+            {order.status.replace(/_/g, ' ')}
+          </Badge>
+          <span
+            className={`text-xs capitalize font-medium ${
+              order.paymentStatus === 'paid'
+                ? 'text-emerald-400'
+                : order.paymentStatus === 'refunded'
+                ? 'text-amber-400'
+                : 'text-slate-400'
+            }`}
+          >
+            Payment: {order.paymentStatus}
+          </span>
+        </div>
       </div>
 
-      {/* Timeline */}
-      {!isCancelled && (
+      {/* Timeline tracking */}
+      {!isCancelled ? (
         <div className="glass rounded-2xl border border-white/8 p-6 mb-6">
-          <h2 className="font-semibold text-white mb-6">Order Tracking</h2>
+          <h2 className="font-semibold text-white mb-6">Shipment Tracking</h2>
           <div className="relative">
             {/* Progress bar */}
             <div className="absolute top-5 left-5 right-5 h-0.5 bg-white/10">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{
-                  width: `${Math.min(100, (currentStep / (TIMELINE_STEPS.length - 1)) * 100)}%`,
+                  width: `${Math.min(
+                    100,
+                    (Math.max(0, currentStep) / (TIMELINE_STEPS.length - 1)) * 100
+                  )}%`,
                 }}
-                transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
                 className="h-full bg-indigo-500 rounded-full"
               />
             </div>
@@ -111,10 +286,7 @@ export default function OrderDetailPage() {
                 const done = i <= currentStep;
                 return (
                   <div key={status} className="flex flex-col items-center gap-2 flex-1">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2 + i * 0.1, type: 'spring' }}
+                    <div
                       className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
                         done
                           ? 'bg-indigo-500 border-indigo-500 text-white'
@@ -122,8 +294,12 @@ export default function OrderDetailPage() {
                       }`}
                     >
                       <Icon size={16} />
-                    </motion.div>
-                    <p className={`text-xs text-center hidden sm:block ${done ? 'text-white' : 'text-slate-600'}`}>
+                    </div>
+                    <p
+                      className={`text-xs text-center hidden sm:block ${
+                        done ? 'text-white' : 'text-slate-600'
+                      }`}
+                    >
                       {label}
                     </p>
                   </div>
@@ -132,90 +308,189 @@ export default function OrderDetailPage() {
             </div>
           </div>
           {order.estimatedDelivery && (
-            <p className="text-xs text-slate-500 mt-5 text-center">
-              Estimated delivery: <span className="text-white">{formatDate(order.estimatedDelivery)}</span>
+            <p className="text-xs text-slate-400 mt-6 text-center">
+              Estimated delivery: <span className="text-white font-medium">{formatDate(order.estimatedDelivery)}</span>
             </p>
           )}
           {order.trackingNumber && (
-            <p className="text-xs text-slate-500 mt-1 text-center">
-              Tracking #: <span className="font-mono text-indigo-300">{order.trackingNumber}</span>
+            <p className="text-xs text-slate-400 mt-1 text-center">
+              Tracking Number: <span className="font-mono text-indigo-300 font-semibold">{order.trackingNumber}</span>
             </p>
           )}
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 mb-6 flex items-center gap-3">
+          <XCircle size={22} className="flex-shrink-0" />
+          <p className="text-sm">
+            This order was cancelled. Reserved inventory has been safely restored.
+          </p>
         </div>
       )}
 
       <div className="grid sm:grid-cols-2 gap-6 mb-6">
-        {/* Shipping Address */}
+        {/* Delivery Address Snapshot */}
         <div className="glass rounded-2xl border border-white/8 p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin size={16} className="text-indigo-400" />
-            <h3 className="font-semibold text-white text-sm">Shipping Address</h3>
+            <h3 className="font-semibold text-white text-sm">Delivery Address Snapshot</h3>
           </div>
           <p className="text-sm text-white font-medium">{order.shippingAddress.fullName}</p>
           <p className="text-sm text-slate-400">{order.shippingAddress.addressLine1}</p>
           {order.shippingAddress.addressLine2 && (
             <p className="text-sm text-slate-400">{order.shippingAddress.addressLine2}</p>
           )}
+          {order.shippingAddress.landmark && (
+            <p className="text-xs text-slate-500 mt-0.5">Landmark: {order.shippingAddress.landmark}</p>
+          )}
           <p className="text-sm text-slate-400">
             {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
           </p>
           <p className="text-sm text-slate-400">{order.shippingAddress.country}</p>
-          <p className="text-sm text-slate-400 mt-1">{order.shippingAddress.phone}</p>
+          <p className="text-sm text-slate-400 mt-2">Phone: {order.shippingAddress.phone}</p>
         </div>
 
-        {/* Payment */}
+        {/* Payment & Billing */}
         <div className="glass rounded-2xl border border-white/8 p-5">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard size={16} className="text-indigo-400" />
-            <h3 className="font-semibold text-white text-sm">Payment Details</h3>
+            <h3 className="font-semibold text-white text-sm">Payment & Financials</h3>
           </div>
-          <p className="text-sm text-white capitalize mb-1">
-            {order.paymentMethod === 'card' ? 'Credit / Debit Card' : order.paymentMethod.toUpperCase()}
-          </p>
-          <p className={`text-sm capitalize ${order.paymentStatus === 'paid' ? 'text-emerald-400' : order.paymentStatus === 'refunded' ? 'text-amber-400' : 'text-slate-400'}`}>
-            {order.paymentStatus}
-          </p>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-slate-400">Payment Method</span>
+            <span className="text-white capitalize font-medium">
+              {order.paymentMethod === 'card'
+                ? 'Credit / Debit Card'
+                : order.paymentMethod === 'upi'
+                ? 'UPI'
+                : 'Cash on Delivery'}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs mb-3">
+            <span className="text-slate-400">Payment Status</span>
+            <span
+              className={`capitalize font-semibold ${
+                order.paymentStatus === 'paid'
+                  ? 'text-emerald-400'
+                  : order.paymentStatus === 'refunded'
+                  ? 'text-amber-400'
+                  : 'text-slate-400'
+              }`}
+            >
+              {order.paymentStatus}
+            </span>
+          </div>
 
-          <div className="border-t border-white/8 mt-4 pt-4 flex flex-col gap-2">
-            <div className="flex justify-between text-sm">
+          <div className="border-t border-white/8 pt-3 flex flex-col gap-2">
+            <div className="flex justify-between text-xs">
               <span className="text-slate-400">Subtotal</span>
               <span className="text-white">{formatCurrency(order.subtotal)}</span>
             </div>
             {order.discount > 0 && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Discount</span>
                 <span className="text-emerald-400">-{formatCurrency(order.discount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs">
               <span className="text-slate-400">Shipping</span>
-              <span className="text-emerald-400">{order.shipping === 0 ? 'Free' : formatCurrency(order.shipping)}</span>
+              <span className="text-white">
+                {order.shipping === 0 ? 'Free' : formatCurrency(order.shipping)}
+              </span>
             </div>
-            <div className="flex justify-between font-bold pt-2 border-t border-white/8">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">Tax</span>
+              <span className="text-slate-400">Included ({formatCurrency(order.tax || 0)})</span>
+            </div>
+            <div className="flex justify-between font-bold pt-2 border-t border-white/8 text-sm">
               <span className="text-white">Total</span>
-              <span className="text-white text-lg">{formatCurrency(order.total)}</span>
+              <span className="text-white font-display text-base">{formatCurrency(order.total)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Items */}
+      {/* Order Items */}
       <div className="glass rounded-2xl border border-white/8 p-5">
-        <h3 className="font-semibold text-white mb-4">Order Items ({order.items.length})</h3>
+        <h3 className="font-semibold text-white mb-4">
+          Order Items ({order.items.length})
+        </h3>
         <div className="flex flex-col gap-3">
           {order.items.map((item) => (
-            <div key={item.productId} className="flex items-center gap-4">
+            <div
+              key={item.id || item.productId}
+              className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.02] border border-white/6"
+            >
               <OrderItemDetailThumb src={item.productImage} alt={item.productName} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white line-clamp-1">{item.productName}</p>
-                {item.variant && <p className="text-xs text-slate-500">{item.variant}</p>}
-                <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
+                {item.variant && <p className="text-xs text-slate-400">{item.variant}</p>}
+                <p className="text-xs text-slate-500">
+                  Unit Price: {formatCurrency(item.price)} • Quantity: {item.quantity}
+                </p>
               </div>
-              <p className="text-sm font-bold text-white">{formatCurrency(item.price * item.quantity)}</p>
+              <div className="text-right">
+                <p className="text-sm font-bold text-white">
+                  {formatCurrency(item.price * item.quantity)}
+                </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Cancellation Modal */}
+      <AnimatePresence>
+        {showCancelModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass rounded-2xl border border-white/10 p-6 max-w-md w-full"
+            >
+              <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
+                <RotateCcw size={24} />
+              </div>
+
+              <h3 className="font-display text-lg font-bold text-white mb-2">
+                Cancel Order {order.id}?
+              </h3>
+              <p className="text-slate-400 text-sm mb-4">
+                Are you sure you want to cancel this order? The reserved inventory for all items will be restored immediately.
+              </p>
+
+              {cancelError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  {cancelError}
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setCancelError(null);
+                  }}
+                  disabled={cancelling}
+                >
+                  Keep Order
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  leftIcon={cancelling ? <Loader2 className="animate-spin" size={14} /> : <XCircle size={14} />}
+                >
+                  {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

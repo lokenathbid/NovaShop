@@ -1,96 +1,509 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { CreditCard, Smartphone, Package, Truck, Clock, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  CreditCard,
+  Smartphone,
+  Banknote,
+  Package,
+  Truck,
+  Clock,
+  Check,
+  MapPin,
+  Plus,
+  AlertCircle,
+  Loader2,
+  ShieldCheck,
+  ArrowRight,
+  ShoppingBag,
+} from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Link from 'next/link';
+import type { Address } from '@/types';
 
 type PaymentMethod = 'card' | 'upi' | 'cod';
 type DeliveryMethod = 'standard' | 'express' | 'overnight';
 
-const deliveryOptions = [
-  { id: 'standard' as DeliveryMethod, label: 'Standard Delivery', time: '4–6 business days', price: 0 },
-  { id: 'express' as DeliveryMethod, label: 'Express Delivery', time: '2–3 business days', price: 149 },
-  { id: 'overnight' as DeliveryMethod, label: 'Overnight Delivery', time: 'Next business day', price: 299 },
-];
+interface NewAddressForm {
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string;
+  landmark: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+}
+
+const initialAddressForm: NewAddressForm = {
+  fullName: '',
+  phone: '',
+  addressLine1: '',
+  addressLine2: '',
+  landmark: '',
+  city: '',
+  state: '',
+  zipCode: '',
+  country: 'India',
+};
 
 export default function CheckoutPage() {
-  const { items, subtotal, discount, total } = useCart();
+  const { data: session, status: authStatus } = useSession();
+  const router = useRouter();
+  const { items, subtotal, discount, loading: cartLoading, refreshCart } = useCart();
+
+  // Address state
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [useCustomAddress, setUseCustomAddress] = useState(false);
+  const [addressForm, setAddressForm] = useState<NewAddressForm>(initialAddressForm);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+
+  // Delivery & payment
   const [delivery, setDelivery] = useState<DeliveryMethod>('standard');
   const [payment, setPayment] = useState<PaymentMethod>('card');
-  const [placed, setPlaced] = useState(false);
 
-  const deliveryCost = deliveryOptions.find((d) => d.id === delivery)?.price ?? 0;
-  const grandTotal = total + deliveryCost;
+  // Confirmation & submission
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (placed) {
+  // Idempotency key per checkout attempt
+  const idempotencyKeyRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = `checkout-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
+  }, []);
+
+  // Fetch saved addresses
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAddresses() {
+      if (authStatus !== 'authenticated') {
+        if (authStatus === 'unauthenticated') {
+          setLoadingAddresses(false);
+        }
+        return;
+      }
+
+      try {
+        setLoadingAddresses(true);
+        const res = await fetch('/api/account/addresses');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.addresses) {
+            setAddresses(data.addresses);
+            const defaultAddr = data.addresses.find((a: Address) => a.isDefault);
+            if (defaultAddr) {
+              setSelectedAddressId(defaultAddr.id);
+            } else if (data.addresses.length > 0) {
+              setSelectedAddressId(data.addresses[0].id);
+            } else {
+              setUseCustomAddress(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load addresses:', err);
+      } finally {
+        if (isMounted) setLoadingAddresses(false);
+      }
+    }
+
+    loadAddresses();
+    return () => {
+      isMounted = false;
+    };
+  }, [authStatus]);
+
+  // Delivery calculation matching server rules
+  let deliveryCost = 0;
+  if (delivery === 'express') {
+    deliveryCost = 149;
+  } else if (delivery === 'overnight') {
+    deliveryCost = 299;
+  } else {
+    deliveryCost = subtotal > 999 || subtotal === 0 ? 0 : 99;
+  }
+
+  const tax = 0; // standard inclusive
+  const finalTotal = Math.round((subtotal + deliveryCost + tax) * 100) / 100;
+
+  // Unauthenticated view
+  if (authStatus === 'unauthenticated') {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-center max-w-sm"
-        >
-          <div className="w-20 h-20 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mx-auto mb-6">
-            <Check size={36} className="text-emerald-400" />
+      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+        <div className="glass rounded-3xl border border-white/8 p-8 sm:p-12">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-6 text-indigo-400">
+            <ShieldCheck size={32} />
           </div>
-          <h2 className="font-display text-3xl font-bold text-white mb-2">Order Placed!</h2>
-          <p className="text-slate-400 mb-8">
-            Thank you for your order. You'll receive a confirmation email shortly.
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-white mb-3">
+            Sign in to Complete Checkout
+          </h2>
+          <p className="text-slate-400 mb-8 max-w-md mx-auto text-sm sm:text-base">
+            Please log in or create an account to access your saved addresses, secure payment, and track your orders.
           </p>
-          <Link href="/orders">
-            <Button fullWidth>View My Orders</Button>
-          </Link>
-        </motion.div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/login?callbackUrl=/checkout">
+              <Button size="lg" className="w-full sm:w-auto">
+                Sign In to Proceed
+              </Button>
+            </Link>
+            <Link href="/register?callbackUrl=/checkout">
+              <Button variant="secondary" size="lg" className="w-full sm:w-auto">
+                Create Account
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // Loading state
+  if (cartLoading || authStatus === 'loading') {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-indigo-400" size={36} />
+        <p className="text-slate-400 text-sm">Preparing checkout details...</p>
+      </div>
+    );
+  }
+
+  // Empty cart view
+  if (items.length === 0) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <div className="glass rounded-3xl border border-white/8 p-8 sm:p-12">
+          <ShoppingBag size={48} className="text-slate-600 mx-auto mb-4" />
+          <h2 className="font-display text-2xl font-bold text-white mb-2">Your Cart is Empty</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            Looks like you haven't added any products to your cart yet.
+          </p>
+          <Link href="/shop">
+            <Button leftIcon={<Package size={16} />}>Explore Products</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!confirmed) {
+      setError('Please check the confirmation box to verify your order.');
+      return;
+    }
+
+    if (!useCustomAddress && !selectedAddressId) {
+      setError('Please select a shipping address or enter a new one.');
+      return;
+    }
+
+    if (useCustomAddress) {
+      if (
+        !addressForm.fullName ||
+        !addressForm.phone ||
+        !addressForm.addressLine1 ||
+        !addressForm.city ||
+        !addressForm.state ||
+        !addressForm.zipCode
+      ) {
+        setError('Please fill in all required shipping address fields.');
+        return;
+      }
+    }
+
+    try {
+      setSubmitting(true);
+
+      const payload: any = {
+        deliveryMethod: delivery,
+        paymentMethod: payment,
+        idempotencyKey: idempotencyKeyRef.current,
+      };
+
+      if (useCustomAddress) {
+        payload.shippingAddress = addressForm;
+      } else {
+        payload.addressId = selectedAddressId;
+      }
+
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to place order.');
+      }
+
+      // Refresh cart context to reflect cleared state
+      await refreshCart();
+
+      // Redirect to order details with celebration
+      router.push(`/orders/${data.order.id}?confirmed=true`);
+    } catch (err: any) {
+      console.error('Order placement error:', err);
+      setError(err?.message || 'Something went wrong while placing your order.');
+      // Refresh idempotency key on complete failure so user can retry safely
+      idempotencyKeyRef.current = `checkout-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <h1 className="font-display text-3xl font-bold text-white mb-8">Checkout</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-white mb-1">Checkout</h1>
+          <p className="text-slate-400 text-sm">Review your delivery and payment details</p>
+        </div>
+        <Link href="/cart" className="text-sm text-indigo-400 hover:text-indigo-300">
+          ← Back to Cart
+        </Link>
+      </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-start gap-3"
+        >
+          <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold">Unable to place order</p>
+            <p>{error}</p>
+          </div>
+        </motion.div>
+      )}
+
+      <form onSubmit={handlePlaceOrder} className="flex flex-col lg:flex-row gap-8">
         {/* Left: Forms */}
         <div className="flex-1 flex flex-col gap-6">
-          {/* Contact */}
+          {/* 1. Delivery Address */}
           <section className="glass rounded-2xl border border-white/8 p-6">
-            <h2 className="font-semibold text-white mb-5">1. Contact Information</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Input label="Email" type="email" placeholder="you@example.com" />
-              <Input label="Phone" type="tel" placeholder="+91 98765 43210" />
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <MapPin size={20} className="text-indigo-400" />
+                <h2 className="font-semibold text-white text-lg">1. Shipping Address</h2>
+              </div>
+              <Link
+                href="/account/addresses"
+                target="_blank"
+                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Manage Saved Addresses ↗
+              </Link>
             </div>
+
+            {loadingAddresses ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm py-4">
+                <Loader2 className="animate-spin text-indigo-400" size={18} />
+                Loading saved addresses...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Saved addresses options */}
+                {addresses.length > 0 && (
+                  <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                    {addresses.map((addr) => {
+                      const isSelected = !useCustomAddress && selectedAddressId === addr.id;
+                      return (
+                        <div
+                          key={addr.id}
+                          onClick={() => {
+                            setSelectedAddressId(addr.id);
+                            setUseCustomAddress(false);
+                          }}
+                          className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'border-indigo-500/60 bg-indigo-500/10 ring-1 ring-indigo-500/30'
+                              : 'border-white/8 hover:border-white/15 bg-white/[0.02]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white/10 text-white capitalize">
+                              {addr.label || addr.type || 'Home'}
+                            </span>
+                            {addr.isDefault && (
+                              <span className="text-[10px] text-emerald-400 font-medium">Default</span>
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-white">{addr.fullName}</p>
+                          <p className="text-xs text-slate-400 line-clamp-1">{addr.addressLine1}</p>
+                          {addr.addressLine2 && (
+                            <p className="text-xs text-slate-400 line-clamp-1">{addr.addressLine2}</p>
+                          )}
+                          <p className="text-xs text-slate-400">
+                            {addr.city}, {addr.state} - {addr.zipCode}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">{addr.phone}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Option to toggle custom address */}
+                <div className="pt-2">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-indigo-300 hover:text-indigo-200">
+                    <input
+                      type="checkbox"
+                      checked={useCustomAddress}
+                      onChange={(e) => setUseCustomAddress(e.target.checked)}
+                      className="rounded accent-indigo-500"
+                    />
+                    <span>Deliver to a new address</span>
+                  </label>
+                </div>
+
+                {/* New address input fields */}
+                <AnimatePresence>
+                  {useCustomAddress && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/8 mt-3"
+                    >
+                      <Input
+                        label="Full Name *"
+                        placeholder="Arjun Mehta"
+                        value={addressForm.fullName}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, fullName: e.target.value })
+                        }
+                        className="sm:col-span-2"
+                        required
+                      />
+                      <Input
+                        label="Phone Number *"
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={addressForm.phone}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, phone: e.target.value })
+                        }
+                        required
+                      />
+                      <Input
+                        label="Country"
+                        value={addressForm.country}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, country: e.target.value })
+                        }
+                      />
+                      <Input
+                        label="Address Line 1 *"
+                        placeholder="House / Flat / Street"
+                        value={addressForm.addressLine1}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, addressLine1: e.target.value })
+                        }
+                        className="sm:col-span-2"
+                        required
+                      />
+                      <Input
+                        label="Address Line 2 (Optional)"
+                        placeholder="Apartment, suite, unit"
+                        value={addressForm.addressLine2}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, addressLine2: e.target.value })
+                        }
+                        className="sm:col-span-2"
+                      />
+                      <Input
+                        label="Landmark (Optional)"
+                        placeholder="Near Metro Station"
+                        value={addressForm.landmark}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, landmark: e.target.value })
+                        }
+                      />
+                      <Input
+                        label="City *"
+                        placeholder="Mumbai"
+                        value={addressForm.city}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, city: e.target.value })
+                        }
+                        required
+                      />
+                      <Input
+                        label="State *"
+                        placeholder="Maharashtra"
+                        value={addressForm.state}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, state: e.target.value })
+                        }
+                        required
+                      />
+                      <Input
+                        label="PIN / ZIP Code *"
+                        placeholder="400058"
+                        value={addressForm.zipCode}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, zipCode: e.target.value })
+                        }
+                        required
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </section>
 
-          {/* Shipping Address */}
+          {/* 2. Delivery Method */}
           <section className="glass rounded-2xl border border-white/8 p-6">
-            <h2 className="font-semibold text-white mb-5">2. Shipping Address</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Input label="Full Name" placeholder="Arjun Mehta" className="sm:col-span-2" />
-              <Input label="Address Line 1" placeholder="Flat 4B, Skyline Residency" className="sm:col-span-2" />
-              <Input label="Address Line 2 (optional)" placeholder="Andheri West" className="sm:col-span-2" />
-              <Input label="City" placeholder="Mumbai" />
-              <Input label="State" placeholder="Maharashtra" />
-              <Input label="PIN Code" placeholder="400058" />
-              <Input label="Country" placeholder="India" />
-              <Input label="Phone" type="tel" placeholder="+91 98765 43210" />
+            <div className="flex items-center gap-2 mb-5">
+              <Truck size={20} className="text-indigo-400" />
+              <h2 className="font-semibold text-white text-lg">2. Delivery Method</h2>
             </div>
-          </section>
-
-          {/* Delivery */}
-          <section className="glass rounded-2xl border border-white/8 p-6">
-            <h2 className="font-semibold text-white mb-5">3. Delivery Method</h2>
             <div className="flex flex-col gap-3">
-              {deliveryOptions.map((opt) => (
+              {[
+                {
+                  id: 'standard' as DeliveryMethod,
+                  label: 'Standard Delivery',
+                  time: '4–6 business days',
+                  price: subtotal > 999 || subtotal === 0 ? 0 : 99,
+                  badge: subtotal > 999 ? 'Free on orders above ₹999' : '₹99 standard rate',
+                },
+                {
+                  id: 'express' as DeliveryMethod,
+                  label: 'Express Delivery',
+                  time: '2–3 business days',
+                  price: 149,
+                  badge: 'Faster transit',
+                },
+                {
+                  id: 'overnight' as DeliveryMethod,
+                  label: 'Overnight Delivery',
+                  time: 'Next business day',
+                  price: 299,
+                  badge: 'Priority processing',
+                },
+              ].map((opt) => (
                 <label
                   key={opt.id}
                   className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                     delivery === opt.id
-                      ? 'border-indigo-500/60 bg-indigo-500/10'
+                      ? 'border-indigo-500/60 bg-indigo-500/10 ring-1 ring-indigo-500/30'
                       : 'border-white/8 hover:border-white/15'
                   }`}
                 >
@@ -104,11 +517,15 @@ export default function CheckoutPage() {
                   />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-white">{opt.label}</p>
-                    <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                      <Clock size={11} /> {opt.time}
+                    <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                      <Clock size={11} /> {opt.time} • <span className="text-slate-500">{opt.badge}</span>
                     </p>
                   </div>
-                  <span className={`text-sm font-semibold ${opt.price === 0 ? 'text-emerald-400' : 'text-white'}`}>
+                  <span
+                    className={`text-sm font-semibold ${
+                      opt.price === 0 ? 'text-emerald-400' : 'text-white'
+                    }`}
+                  >
                     {opt.price === 0 ? 'Free' : formatCurrency(opt.price)}
                   </span>
                 </label>
@@ -116,20 +533,38 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {/* Payment */}
+          {/* 3. Payment Method */}
           <section className="glass rounded-2xl border border-white/8 p-6">
-            <h2 className="font-semibold text-white mb-5">4. Payment Method</h2>
-            <div className="flex flex-col gap-3 mb-5">
+            <div className="flex items-center gap-2 mb-5">
+              <CreditCard size={20} className="text-indigo-400" />
+              <h2 className="font-semibold text-white text-lg">3. Payment Method</h2>
+            </div>
+            <div className="flex flex-col gap-3 mb-4">
               {[
-                { id: 'card' as PaymentMethod, icon: CreditCard, label: 'Credit / Debit Card' },
-                { id: 'upi' as PaymentMethod, icon: Smartphone, label: 'UPI' },
-                { id: 'cod' as PaymentMethod, icon: Package, label: 'Cash on Delivery' },
-              ].map(({ id, icon: Icon, label }) => (
+                {
+                  id: 'card' as PaymentMethod,
+                  icon: CreditCard,
+                  label: 'Credit / Debit Card',
+                  sub: 'Prepaid order simulation (Recorded as Pending)',
+                },
+                {
+                  id: 'upi' as PaymentMethod,
+                  icon: Smartphone,
+                  label: 'UPI (GPay / PhonePe / Paytm)',
+                  sub: 'Instant UPI checkout (Recorded as Pending)',
+                },
+                {
+                  id: 'cod' as PaymentMethod,
+                  icon: Banknote,
+                  label: 'Cash on Delivery (COD)',
+                  sub: 'Pay when your package arrives at your door (Recorded as Unpaid)',
+                },
+              ].map(({ id, icon: Icon, label, sub }) => (
                 <label
                   key={id}
-                  className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
+                  className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                     payment === id
-                      ? 'border-indigo-500/60 bg-indigo-500/10'
+                      ? 'border-indigo-500/60 bg-indigo-500/10 ring-1 ring-indigo-500/30'
                       : 'border-white/8 hover:border-white/15'
                   }`}
                 >
@@ -139,53 +574,48 @@ export default function CheckoutPage() {
                     value={id}
                     checked={payment === id}
                     onChange={() => setPayment(id)}
-                    className="accent-indigo-500"
+                    className="accent-indigo-500 mt-1"
                   />
-                  <Icon size={18} className="text-slate-400" />
-                  <span className="text-sm font-medium text-white">{label}</span>
+                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                    <Icon size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">{label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+                  </div>
                 </label>
               ))}
             </div>
 
-            {payment === 'card' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="border-t border-white/8 pt-5 grid sm:grid-cols-2 gap-4"
-              >
-                <Input label="Card Number" placeholder="1234 5678 9012 3456" className="sm:col-span-2" />
-                <Input label="Cardholder Name" placeholder="ARJUN MEHTA" className="sm:col-span-2" />
-                <Input label="Expiry" placeholder="MM / YY" />
-                <Input label="CVV" placeholder="•••" type="password" />
-              </motion.div>
-            )}
-            {payment === 'upi' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="border-t border-white/8 pt-5"
-              >
-                <Input label="UPI ID" placeholder="yourname@upi" />
-              </motion.div>
-            )}
+            <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-center gap-2.5">
+              <ShieldCheck size={16} className="flex-shrink-0" />
+              <span>
+                Note: In this stage, payments are registered safely without collecting confidential card credentials or CVVs. Payment status will be logged as Pending / Unpaid.
+              </span>
+            </div>
           </section>
         </div>
 
         {/* Right: Order Summary */}
-        <div className="lg:w-80 flex-shrink-0">
+        <div className="lg:w-96 flex-shrink-0">
           <div className="glass rounded-2xl border border-white/8 p-6 sticky top-24">
             <h3 className="font-semibold text-white text-lg mb-5">Order Summary</h3>
 
-            <div className="flex flex-col gap-3 mb-5 max-h-64 overflow-y-auto pr-1">
+            {/* Cart items list */}
+            <div className="flex flex-col gap-3 mb-5 max-h-72 overflow-y-auto pr-1">
               {items.map((item) => (
-                <div key={item.productId} className="flex items-center gap-3">
+                <div key={item.id || item.productId} className="flex items-center gap-3">
                   <img
-                    src={item.product.images[0]?.url}
+                    src={
+                      item.product.images[0]?.url ||
+                      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80'
+                    }
                     alt={item.product.name}
-                    className="w-12 h-12 rounded-lg flex-shrink-0 object-cover"
+                    className="w-12 h-12 rounded-lg flex-shrink-0 object-cover bg-white/5 border border-white/10"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-white line-clamp-1">{item.product.name}</p>
+                    <p className="text-xs text-white line-clamp-1 font-medium">{item.product.name}</p>
+                    {item.variant && <p className="text-[10px] text-slate-400">{item.variant}</p>}
                     <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
                   </div>
                   <p className="text-xs font-semibold text-white">
@@ -195,10 +625,11 @@ export default function CheckoutPage() {
               ))}
             </div>
 
+            {/* Price breakdown */}
             <div className="border-t border-white/8 pt-4 flex flex-col gap-2.5 mb-5">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Subtotal</span>
-                <span className="text-white">{formatCurrency(subtotal)}</span>
+                <span className="text-white font-medium">{formatCurrency(subtotal)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -208,31 +639,58 @@ export default function CheckoutPage() {
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Shipping</span>
-                <span className={deliveryCost === 0 ? 'text-emerald-400' : 'text-white'}>
+                <span className={deliveryCost === 0 ? 'text-emerald-400 font-medium' : 'text-white'}>
                   {deliveryCost === 0 ? 'Free' : formatCurrency(deliveryCost)}
                 </span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Tax</span>
+                <span className="text-slate-400">Included (₹0.00)</span>
+              </div>
               <div className="border-t border-white/8 pt-3 flex justify-between font-bold">
-                <span className="text-white">Total</span>
-                <span className="text-xl text-white">{formatCurrency(grandTotal)}</span>
+                <span className="text-white text-base">Total Amount</span>
+                <span className="text-xl text-white font-display">{formatCurrency(finalTotal)}</span>
               </div>
             </div>
 
+            {/* Explicit confirmation */}
+            <div className="mb-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/8">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(e) => setConfirmed(e.target.checked)}
+                  className="rounded accent-indigo-500 mt-1 cursor-pointer"
+                />
+                <span className="text-xs text-slate-300 leading-relaxed select-none">
+                  I have verified my delivery address and order items, and confirm this order placement.
+                </span>
+              </label>
+            </div>
+
             <Button
+              type="submit"
               fullWidth
               size="lg"
-              onClick={() => setPlaced(true)}
-              leftIcon={<Truck size={18} />}
+              disabled={submitting || !confirmed}
+              leftIcon={
+                submitting ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <Check size={18} />
+                )
+              }
             >
-              Place Order
+              {submitting ? 'Placing Order...' : `Place Order • ${formatCurrency(finalTotal)}`}
             </Button>
 
-            <p className="text-center text-xs text-slate-600 mt-4">
-              🔒 Secured by 256-bit SSL encryption
+            <p className="text-center text-[11px] text-slate-500 mt-4 flex items-center justify-center gap-1.5">
+              <ShieldCheck size={13} className="text-emerald-400" />
+              Idempotency protected • Safe transaction
             </p>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

@@ -149,12 +149,16 @@ model Order {
   subtotal          Float
   discount          Float       @default(0)
   shipping          Float       @default(0)
+  tax               Float       @default(0)
   total             Float
   estimatedDelivery DateTime?
   trackingNumber    String?
+  idempotencyKey    String?     @unique
   items             OrderItem[]
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+
+  @@index([userId])
 }
 
 model OrderItem {
@@ -169,6 +173,9 @@ model OrderItem {
   quantity      Int
   price         Float
   originalPrice Float?
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model PasswordResetToken {
