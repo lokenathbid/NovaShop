@@ -116,6 +116,23 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface PaymentRecord {
+  id: string;
+  orderId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId?: string | null;
+  razorpaySignature?: string | null;
+  amount: number;
+  currency: string;
+  status: 'created' | 'authorized' | 'captured' | 'failed' | 'refunded';
+  method?: string | null;
+  errorMessage?: string | null;
+  idempotencyKey?: string | null;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Order {
   id: string;
   userId: string;
@@ -130,6 +147,10 @@ export interface Order {
   tax?: number;
   total: number;
   idempotencyKey?: string | null;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
+  razorpaySignature?: string | null;
+  payments?: PaymentRecord[];
   createdAt: string;
   updatedAt: string;
   estimatedDelivery?: string | null;

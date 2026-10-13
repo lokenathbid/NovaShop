@@ -25,7 +25,8 @@ import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import type { Address } from '@/types';
+import type { Address, Order } from '@/types';
+import { openRazorpayCheckout } from '@/lib/razorpay-client';
 
 type PaymentMethod = 'card' | 'upi' | 'cod';
 type DeliveryMethod = 'standard' | 'express' | 'overnight';
@@ -70,9 +71,11 @@ export default function CheckoutPage() {
   const [delivery, setDelivery] = useState<DeliveryMethod>('standard');
   const [payment, setPayment] = useState<PaymentMethod>('card');
 
-  // Confirmation & submission
+  // Confirmation, submission & payment verification
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Idempotency key per checkout attempt
@@ -240,6 +243,7 @@ export default function CheckoutPage() {
         payload.addressId = selectedAddressId;
       }
 
+      // Step 1 & 2: Create local order and gateway order on server using authoritative prices
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -252,17 +256,128 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Failed to place order.');
       }
 
-      // Refresh cart context to reflect cleared state
-      await refreshCart();
+      // If Cash on Delivery, no gateway required
+      if (payment === 'cod' || !data.razorpay) {
+        await refreshCart();
+        router.push(`/orders/${data.order.id}?confirmed=true`);
+        return;
+      }
 
-      // Redirect to order details with celebration
-      router.push(`/orders/${data.order.id}?confirmed=true`);
+      // Step 3 & 4: Open Razorpay Checkout with authoritative details
+      const activeAddress = useCustomAddress
+        ? addressForm
+        : addresses.find((a) => a.id === selectedAddressId);
+
+      try {
+        await openRazorpayCheckout({
+          keyId: data.razorpay.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
+          orderId: data.razorpay.orderId,
+          amount: data.razorpay.amount,
+          currency: data.razorpay.currency || 'INR',
+          name: 'NovaShop',
+          description: `Order #${data.order.id}`,
+          prefill: {
+            name: activeAddress?.fullName || session?.user?.name || '',
+            email: session?.user?.email || '',
+            contact: activeAddress?.phone || '',
+          },
+          onSuccess: async (rzpResponse) => {
+            // Step 5 & 6: Cryptographic server-side verification of payment signature
+            try {
+              setVerifying(true);
+              const verifyRes = await fetch('/api/payments/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: data.order.id,
+                  razorpayOrderId: rzpResponse.razorpay_order_id,
+                  razorpayPaymentId: rzpResponse.razorpay_payment_id,
+                  razorpaySignature: rzpResponse.razorpay_signature,
+                }),
+              });
+
+              const verifyData = await verifyRes.json();
+              if (!verifyRes.ok) {
+                throw new Error(verifyData.error || 'Payment signature verification failed.');
+              }
+
+              // Step 7: Clear cart and transition to confirmed & paid order page
+              await refreshCart();
+              router.push(`/orders/${data.order.id}?confirmed=true&paid=true`);
+            } catch (vErr: any) {
+              console.error('Payment verification error:', vErr);
+              setError(vErr.message || 'Payment verification failed on the server.');
+              setSubmitting(false);
+              setVerifying(false);
+              await refreshCart();
+              router.push(`/orders/${data.order.id}?paymentFailed=true`);
+            }
+          },
+          onDismiss: async () => {
+            // Handle abandoned or dismissed payment window safely
+            setSubmitting(false);
+            setVerifying(false);
+            setError(
+              'Payment window was closed before completion. Your order has been placed in Pending status. You can retry payment anytime.'
+            );
+            try {
+              await fetch('/api/payments/fail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: data.order.id,
+                  razorpayOrderId: data.razorpay.orderId,
+                  errorMessage: 'Payment window was closed by the user.',
+                }),
+              });
+            } catch (failLogErr) {
+              console.error('Failed to report payment dismissal:', failLogErr);
+            }
+            await refreshCart();
+            setPendingOrder(data.order);
+          },
+          onFailure: async (failData) => {
+            // Handle explicit card/bank decline from Razorpay
+            setSubmitting(false);
+            setVerifying(false);
+            setError(
+              `Payment failed: ${failData?.description || 'Transaction declined'}. Your reserved items are saved. Please retry.`
+            );
+            try {
+              await fetch('/api/payments/fail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: data.order.id,
+                  razorpayOrderId: data.razorpay.orderId,
+                  razorpayPaymentId: failData?.metadata?.payment_id,
+                  errorMessage: failData?.description || 'Payment failed',
+                  metadata: failData,
+                }),
+              });
+            } catch (failLogErr) {
+              console.error('Failed to report payment failure:', failLogErr);
+            }
+            await refreshCart();
+            setPendingOrder(data.order);
+          },
+        });
+      } catch (checkoutErr: any) {
+        console.error('Razorpay initialization error:', checkoutErr);
+        setSubmitting(false);
+        setVerifying(false);
+        await refreshCart();
+        setPendingOrder(data.order);
+        setError(
+          checkoutErr.message || 'Unable to open Razorpay payment gateway. You can view your order to retry payment.'
+        );
+      }
     } catch (err: any) {
       console.error('Order placement error:', err);
       setError(err?.message || 'Something went wrong while placing your order.');
-      // Refresh idempotency key on complete failure so user can retry safely
       idempotencyKeyRef.current = `checkout-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       setSubmitting(false);
+      setVerifying(false);
     }
   };
 
@@ -545,19 +660,19 @@ export default function CheckoutPage() {
                   id: 'card' as PaymentMethod,
                   icon: CreditCard,
                   label: 'Credit / Debit Card',
-                  sub: 'Prepaid order simulation (Recorded as Pending)',
+                  sub: 'Visa, Mastercard, RuPay & Amex via Razorpay Test Gateway',
                 },
                 {
                   id: 'upi' as PaymentMethod,
                   icon: Smartphone,
-                  label: 'UPI (GPay / PhonePe / Paytm)',
-                  sub: 'Instant UPI checkout (Recorded as Pending)',
+                  label: 'UPI (Instant Pay)',
+                  sub: 'Google Pay, PhonePe, Paytm & BHIM UPI via Razorpay',
                 },
                 {
                   id: 'cod' as PaymentMethod,
                   icon: Banknote,
                   label: 'Cash on Delivery (COD)',
-                  sub: 'Pay when your package arrives at your door (Recorded as Unpaid)',
+                  sub: 'Pay when your package arrives (Recorded as Unpaid until delivered)',
                 },
               ].map(({ id, icon: Icon, label, sub }) => (
                 <label
@@ -590,7 +705,7 @@ export default function CheckoutPage() {
             <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-center gap-2.5">
               <ShieldCheck size={16} className="flex-shrink-0" />
               <span>
-                Note: In this stage, payments are registered safely without collecting confidential card credentials or CVVs. Payment status will be logged as Pending / Unpaid.
+                Razorpay Test Mode: Payments are verified server-side with HMAC-SHA256 signatures. Sensitive payment credentials (cards, CVVs, UPI PINs) are never processed or stored on our servers.
               </span>
             </div>
           </section>
@@ -653,6 +768,22 @@ export default function CheckoutPage() {
               </div>
             </div>
 
+            {/* Pending order recovery if payment was interrupted */}
+            {pendingOrder && (
+              <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                <p className="font-semibold mb-1">Order #{pendingOrder.id} Saved</p>
+                <p className="mb-2 text-slate-300">
+                  Your order has been recorded with reserved stock. You can complete payment now or view order details.
+                </p>
+                <Link
+                  href={`/orders/${pendingOrder.id}`}
+                  className="inline-flex items-center gap-1.5 font-semibold text-indigo-400 hover:text-indigo-300 underline"
+                >
+                  Go to Order Details <ArrowRight size={13} />
+                </Link>
+              </div>
+            )}
+
             {/* Explicit confirmation */}
             <div className="mb-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/8">
               <label className="flex items-start gap-2.5 cursor-pointer">
@@ -672,21 +803,27 @@ export default function CheckoutPage() {
               type="submit"
               fullWidth
               size="lg"
-              disabled={submitting || !confirmed}
+              disabled={submitting || verifying || !confirmed}
               leftIcon={
-                submitting ? (
+                submitting || verifying ? (
                   <Loader2 className="animate-spin" size={18} />
                 ) : (
                   <Check size={18} />
                 )
               }
             >
-              {submitting ? 'Placing Order...' : `Place Order • ${formatCurrency(finalTotal)}`}
+              {verifying
+                ? 'Verifying Payment...'
+                : submitting
+                ? 'Connecting to Gateway...'
+                : payment === 'cod'
+                ? `Place COD Order • ${formatCurrency(finalTotal)}`
+                : `Pay with Razorpay • ${formatCurrency(finalTotal)}`}
             </Button>
 
             <p className="text-center text-[11px] text-slate-500 mt-4 flex items-center justify-center gap-1.5">
               <ShieldCheck size={13} className="text-emerald-400" />
-              Idempotency protected • Safe transaction
+              Razorpay Secured • Idempotency Protected
             </p>
           </div>
         </div>

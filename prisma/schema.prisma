@@ -154,11 +154,36 @@ model Order {
   estimatedDelivery DateTime?
   trackingNumber    String?
   idempotencyKey    String?     @unique
+  razorpayOrderId   String?     @unique
+  razorpayPaymentId String?     @unique
+  razorpaySignature String?
   items             OrderItem[]
+  payments          Payment[]
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
   @@index([userId])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  razorpayOrderId   String
+  razorpayPaymentId String?  @unique
+  razorpaySignature String?
+  amount            Float
+  currency          String   @default("INR")
+  status            String   @default("created")
+  method            String?
+  errorMessage      String?  @db.Text
+  idempotencyKey    String?  @unique
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([razorpayOrderId])
 }
 
 model OrderItem {

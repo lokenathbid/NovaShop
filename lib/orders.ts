@@ -97,6 +97,23 @@ export function formatOrderData(rawOrder: any): Order {
     originalPrice: item.originalPrice != null ? roundCurrency(item.originalPrice) : undefined,
   }));
 
+  const payments: any[] = (rawOrder.payments || []).map((p: any) => ({
+    id: p.id,
+    orderId: p.orderId,
+    razorpayOrderId: p.razorpayOrderId,
+    razorpayPaymentId: p.razorpayPaymentId ?? null,
+    razorpaySignature: p.razorpaySignature ?? null,
+    amount: roundCurrency(p.amount),
+    currency: p.currency,
+    status: p.status,
+    method: p.method ?? null,
+    errorMessage: p.errorMessage ?? null,
+    idempotencyKey: p.idempotencyKey ?? null,
+    metadata: p.metadata ?? null,
+    createdAt: new Date(p.createdAt).toISOString(),
+    updatedAt: new Date(p.updatedAt).toISOString(),
+  }));
+
   return {
     id: rawOrder.id,
     userId: rawOrder.userId,
@@ -110,6 +127,10 @@ export function formatOrderData(rawOrder: any): Order {
     tax: roundCurrency(rawOrder.tax ?? 0),
     total: roundCurrency(rawOrder.total),
     idempotencyKey: rawOrder.idempotencyKey ?? undefined,
+    razorpayOrderId: rawOrder.razorpayOrderId ?? undefined,
+    razorpayPaymentId: rawOrder.razorpayPaymentId ?? undefined,
+    razorpaySignature: rawOrder.razorpaySignature ?? undefined,
+    payments: payments.length > 0 ? payments : undefined,
     estimatedDelivery: rawOrder.estimatedDelivery
       ? new Date(rawOrder.estimatedDelivery).toISOString()
       : undefined,
@@ -384,7 +405,7 @@ export async function createOrderFromCart({
 export async function getUserOrders(userId: string): Promise<Order[]> {
   const orders = await prisma.order.findMany({
     where: { userId },
-    include: { items: true },
+    include: { items: true, payments: true },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -397,7 +418,7 @@ export async function getUserOrders(userId: string): Promise<Order[]> {
 export async function getOrderById(orderId: string, userId?: string): Promise<Order | null> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    include: { items: true, payments: true },
   });
 
   if (!order) return null;
@@ -471,7 +492,7 @@ export async function cancelOrder(orderId: string, userId: string): Promise<Orde
     // 3. Return updated order
     const freshOrder = await tx.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: { items: true, payments: true },
     });
 
     return freshOrder!;

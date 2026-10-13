@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-utils';
 import { createOrderFromCart, getUserOrders } from '@/lib/orders';
+import { initiateOrderPayment } from '@/lib/payments';
 
 /**
  * GET /api/orders
@@ -82,6 +83,24 @@ export async function POST(request: Request) {
       idempotencyKey,
     });
 
+    let razorpayData = null;
+    if (paymentMethod !== 'cod') {
+      try {
+        const paymentInit = await initiateOrderPayment({
+          orderId: result.order.id,
+          userId: authUser.id,
+        });
+        razorpayData = {
+          orderId: paymentInit.razorpayOrderId,
+          amount: paymentInit.amount,
+          currency: paymentInit.currency,
+          keyId: paymentInit.keyId,
+        };
+      } catch (payErr) {
+        console.error('Failed to initialize Razorpay payment for order:', payErr);
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -90,6 +109,7 @@ export async function POST(request: Request) {
           : 'Order placed successfully.',
         order: result.order,
         isDuplicate: result.isDuplicate,
+        razorpay: razorpayData,
       },
       { status: result.isDuplicate ? 200 : 201 }
     );

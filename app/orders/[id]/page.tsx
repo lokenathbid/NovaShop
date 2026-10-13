@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import { openRazorpayCheckout } from '@/lib/razorpay-client';
 
 const TIMELINE_STEPS: { status: OrderStatus; label: string; icon: React.ElementType }[] = [
   { status: 'processing', label: 'Order Placed', icon: Package },
@@ -95,6 +96,11 @@ export default function OrderDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
+  // Payment retry & verification state
+  const [paying, setPaying] = useState(false);
+  const [paymentActionError, setPaymentActionError] = useState<string | null>(null);
+  const [paymentSuccessMsg, setPaymentSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
     async function fetchOrder() {
@@ -133,6 +139,120 @@ export default function OrderDetailPage() {
       isMounted = false;
     };
   }, [id]);
+
+  const handleRetryPayment = async () => {
+    if (!order) return;
+    try {
+      setPaying(true);
+      setPaymentActionError(null);
+      setPaymentSuccessMsg(null);
+
+      // 1. Create or retrieve gateway order
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to initiate payment.');
+      }
+
+      // 2. Open Razorpay Checkout modal
+      await openRazorpayCheckout({
+        keyId: data.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
+        orderId: data.razorpayOrderId,
+        amount: data.amount,
+        currency: data.currency || 'INR',
+        name: 'NovaShop',
+        description: `Order #${order.id}`,
+        prefill: {
+          name: order.shippingAddress.fullName,
+          contact: order.shippingAddress.phone,
+        },
+        onSuccess: async (rzpResponse) => {
+          try {
+            // 3. Server-side signature verification
+            const verifyRes = await fetch('/api/payments/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: order.id,
+                razorpayOrderId: rzpResponse.razorpay_order_id,
+                razorpayPaymentId: rzpResponse.razorpay_payment_id,
+                razorpaySignature: rzpResponse.razorpay_signature,
+              }),
+            });
+
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.error || 'Payment signature verification failed.');
+            }
+
+            setOrder(verifyData.order);
+            setPaymentSuccessMsg('Payment successfully verified and captured!');
+          } catch (vErr: any) {
+            setPaymentActionError(vErr.message || 'Payment verification failed on the server.');
+          } finally {
+            setPaying(false);
+          }
+        },
+        onDismiss: async () => {
+          setPaying(false);
+          setPaymentActionError('Payment window was dismissed before completion.');
+          try {
+            await fetch('/api/payments/fail', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: order.id,
+                razorpayOrderId: data.razorpayOrderId,
+                errorMessage: 'Payment modal was dismissed by the user.',
+              }),
+            });
+            const fresh = await fetch(`/api/orders/${order.id}`);
+            if (fresh.ok) {
+              const freshData = await fresh.json();
+              setOrder(freshData.order);
+            }
+          } catch (logErr) {
+            console.error('Failed to report payment dismissal:', logErr);
+          }
+        },
+        onFailure: async (failData) => {
+          setPaying(false);
+          setPaymentActionError(
+            `Payment failed: ${failData?.description || 'Transaction was declined.'}`
+          );
+          try {
+            await fetch('/api/payments/fail', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: order.id,
+                razorpayOrderId: data.razorpayOrderId,
+                razorpayPaymentId: failData?.metadata?.payment_id,
+                errorMessage: failData?.description || 'Payment failed',
+                metadata: failData,
+              }),
+            });
+            const fresh = await fetch(`/api/orders/${order.id}`);
+            if (fresh.ok) {
+              const freshData = await fresh.json();
+              setOrder(freshData.order);
+            }
+          } catch (logErr) {
+            console.error('Failed to report payment failure:', logErr);
+          }
+        },
+      });
+    } catch (err: any) {
+      console.error('Payment initiation error:', err);
+      setPaymentActionError(err.message || 'Could not launch payment gateway.');
+      setPaying(false);
+    }
+  };
 
   const handleCancel = async () => {
     if (!order) return;
@@ -213,6 +333,57 @@ export default function OrderDetailPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Dynamic Payment State Banners */}
+      {paymentSuccessMsg && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-start gap-3"
+        >
+          <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold">Payment Successful</p>
+            <p>{paymentSuccessMsg}</p>
+          </div>
+        </motion.div>
+      )}
+
+      {paymentActionError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-start gap-3"
+        >
+          <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold">Payment Alert</p>
+            <p>{paymentActionError}</p>
+          </div>
+        </motion.div>
+      )}
+
+      {order.paymentStatus === 'failed' && order.status !== 'cancelled' && !paymentActionError && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={20} className="flex-shrink-0 mt-0.5 text-amber-400" />
+            <div className="text-sm">
+              <p className="font-semibold text-white">Payment Incomplete or Failed</p>
+              <p className="text-slate-300 text-xs">
+                Your order is currently unpaid. Your reserved products will remain held until cancelled.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleRetryPayment}
+            disabled={paying}
+            leftIcon={paying ? <Loader2 className="animate-spin" size={14} /> : <CreditCard size={14} />}
+          >
+            {paying ? 'Opening...' : 'Retry Payment'}
+          </Button>
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-8">
         <Link
@@ -350,62 +521,109 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Payment & Billing */}
-        <div className="glass rounded-2xl border border-white/8 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <CreditCard size={16} className="text-indigo-400" />
-            <h3 className="font-semibold text-white text-sm">Payment & Financials</h3>
-          </div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-slate-400">Payment Method</span>
-            <span className="text-white capitalize font-medium">
-              {order.paymentMethod === 'card'
-                ? 'Credit / Debit Card'
-                : order.paymentMethod === 'upi'
-                ? 'UPI'
-                : 'Cash on Delivery'}
-            </span>
-          </div>
-          <div className="flex justify-between text-xs mb-3">
-            <span className="text-slate-400">Payment Status</span>
-            <span
-              className={`capitalize font-semibold ${
-                order.paymentStatus === 'paid'
-                  ? 'text-emerald-400'
-                  : order.paymentStatus === 'refunded'
-                  ? 'text-amber-400'
-                  : 'text-slate-400'
-              }`}
-            >
-              {order.paymentStatus}
-            </span>
-          </div>
-
-          <div className="border-t border-white/8 pt-3 flex flex-col gap-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Subtotal</span>
-              <span className="text-white">{formatCurrency(order.subtotal)}</span>
-            </div>
-            {order.discount > 0 && (
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400">Discount</span>
-                <span className="text-emerald-400">-{formatCurrency(order.discount)}</span>
+        <div className="glass rounded-2xl border border-white/8 p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <CreditCard size={16} className="text-indigo-400" />
+                <h3 className="font-semibold text-white text-sm">Payment & Financials</h3>
               </div>
-            )}
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Shipping</span>
-              <span className="text-white">
-                {order.shipping === 0 ? 'Free' : formatCurrency(order.shipping)}
+              <Badge
+                variant={
+                  order.paymentStatus === 'paid'
+                    ? 'success'
+                    : order.paymentStatus === 'refunded'
+                    ? 'accent'
+                    : order.paymentStatus === 'failed'
+                    ? 'danger'
+                    : 'warning'
+                }
+              >
+                {order.paymentStatus}
+              </Badge>
+            </div>
+
+            <div className="flex justify-between text-xs mb-1.5">
+              <span className="text-slate-400">Payment Method</span>
+              <span className="text-white capitalize font-medium">
+                {order.paymentMethod === 'card'
+                  ? 'Card (Razorpay)'
+                  : order.paymentMethod === 'upi'
+                  ? 'UPI (Razorpay)'
+                  : 'Cash on Delivery'}
               </span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Tax</span>
-              <span className="text-slate-400">Included ({formatCurrency(order.tax || 0)})</span>
-            </div>
-            <div className="flex justify-between font-bold pt-2 border-t border-white/8 text-sm">
-              <span className="text-white">Total</span>
-              <span className="text-white font-display text-base">{formatCurrency(order.total)}</span>
+
+            {order.razorpayOrderId && (
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-slate-400">Gateway Order ID</span>
+                <span className="font-mono text-[11px] text-slate-300 select-all">
+                  {order.razorpayOrderId}
+                </span>
+              </div>
+            )}
+
+            {order.razorpayPaymentId && (
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-slate-400">Gateway Payment ID</span>
+                <span className="font-mono text-[11px] text-emerald-400 select-all font-semibold">
+                  {order.razorpayPaymentId}
+                </span>
+              </div>
+            )}
+
+            <div className="border-t border-white/8 pt-3 mt-3 flex flex-col gap-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Subtotal</span>
+                <span className="text-white">{formatCurrency(order.subtotal)}</span>
+              </div>
+              {order.discount > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Discount</span>
+                  <span className="text-emerald-400">-{formatCurrency(order.discount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Shipping</span>
+                <span className="text-white">
+                  {order.shipping === 0 ? 'Free' : formatCurrency(order.shipping)}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Tax</span>
+                <span className="text-slate-400">Included ({formatCurrency(order.tax || 0)})</span>
+              </div>
+              <div className="flex justify-between font-bold pt-2 border-t border-white/8 text-sm">
+                <span className="text-white">Total</span>
+                <span className="text-white font-display text-base">{formatCurrency(order.total)}</span>
+              </div>
             </div>
           </div>
+
+          {/* Retry payment button if unpaid/failed and not cancelled */}
+          {order.paymentStatus !== 'paid' && order.status !== 'cancelled' && order.paymentMethod !== 'cod' && (
+            <div className="mt-5 pt-4 border-t border-white/8">
+              <Button
+                fullWidth
+                size="sm"
+                onClick={handleRetryPayment}
+                disabled={paying}
+                leftIcon={
+                  paying ? (
+                    <Loader2 className="animate-spin" size={14} />
+                  ) : (
+                    <CreditCard size={14} />
+                  )
+                }
+              >
+                {paying ? 'Opening Gateway...' : `Pay ${formatCurrency(order.total)} with Razorpay`}
+              </Button>
+              <p className="text-[10px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1">
+                <ShieldCheck size={12} className="text-emerald-400" />
+                Razorpay Test Mode • Secure Checkout
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
