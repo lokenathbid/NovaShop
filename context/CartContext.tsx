@@ -29,7 +29,8 @@ interface CartContextValue {
   addItem: (
     product: Product,
     quantity?: number,
-    selectedVariants?: Record<string, string>
+    selectedVariants?: Record<string, string>,
+    callbackUrl?: string
   ) => Promise<boolean>;
   removeItem: (itemIdOrProductId: string) => Promise<boolean>;
   updateQuantity: (itemIdOrProductId: string, quantity: number) => Promise<boolean>;
@@ -236,7 +237,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     async (
       product: Product,
       quantity = 1,
-      selectedVariants?: Record<string, string>
+      selectedVariants?: Record<string, string>,
+      callbackUrl?: string
     ): Promise<boolean> => {
       if (pendingIds.has(product.id)) {
         return false;
@@ -285,7 +287,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         showNotification('info', 'Please sign in to add items to your cart.');
-        const returnUrl = typeof window !== 'undefined' ? window.location.pathname : '/shop';
+        const returnUrl = callbackUrl || (typeof window !== 'undefined' ? window.location.pathname : '/shop');
         router.push(`/login?callbackUrl=${encodeURIComponent(returnUrl)}`);
         return false;
       }

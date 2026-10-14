@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, notFound } from 'next/navigation';
+import { useParams, notFound, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -80,12 +80,14 @@ export default function ProductPage() {
   const [notFoundState, setNotFoundState] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const router = useRouter();
   const { addItem, isInCart, isItemPending } = useCart();
   const { toggleItem, isWishlisted, isItemPending: isWishlistPending } = useWishlist();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [addedToCart, setAddedToCart] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
 
   // Fetch product from API
   useEffect(() => {
@@ -114,6 +116,17 @@ export default function ProductPage() {
         if (isMounted) {
           setProduct(currentProd);
           setActiveImage(0);
+
+          // Preselect first in-stock variant of each type
+          if (currentProd.variants && currentProd.variants.length > 0) {
+            const defaults: Record<string, string> = {};
+            for (const v of currentProd.variants) {
+              if (v.inStock && !defaults[v.type]) {
+                defaults[v.type] = v.value;
+              }
+            }
+            setSelectedVariants(defaults);
+          }
 
           // Fetch related products based on category
           try {
@@ -202,6 +215,34 @@ export default function ProductPage() {
     if (success) {
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 2000);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (buyingNow || pending || !product.inStock) return;
+
+    try {
+      setBuyingNow(true);
+
+      // Ensure variant selection: use selected or fallback to first available
+      const effectiveVariants = { ...selectedVariants };
+      if (Object.keys(effectiveVariants).length === 0 && Object.keys(variantGroups).length > 0) {
+        for (const [type, vars] of Object.entries(variantGroups)) {
+          const firstInStock = vars?.find((v) => v.inStock);
+          if (firstInStock) {
+            effectiveVariants[type] = firstInStock.value;
+          }
+        }
+      }
+
+      const success = await addItem(product, quantity, effectiveVariants, '/checkout');
+      if (success || inCart) {
+        router.push('/checkout');
+      }
+    } catch (err) {
+      console.error('Failed to execute buy now:', err);
+    } finally {
+      setBuyingNow(false);
     }
   };
 
@@ -409,11 +450,22 @@ export default function ProductPage() {
                 ? 'In Cart'
                 : 'Add to Cart'}
             </Button>
-            <Link href="/checkout" className="flex-1">
-              <Button variant="accent" size="lg" fullWidth leftIcon={<Zap size={18} />}>
-                Buy Now
-              </Button>
-            </Link>
+            <Button
+              disabled={buyingNow || pending || !product.inStock}
+              onClick={handleBuyNow}
+              variant="accent"
+              size="lg"
+              className="flex-1"
+              leftIcon={
+                buyingNow ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Zap size={18} />
+                )
+              }
+            >
+              {buyingNow ? 'Processing...' : 'Buy Now'}
+            </Button>
             <button
               disabled={isWishlistPending(product.id)}
               onClick={() => toggleItem(product)}
