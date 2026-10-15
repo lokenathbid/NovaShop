@@ -19,7 +19,13 @@ export function getRazorpayWebhookSecret(): string {
 export function isRazorpayConfigured(): boolean {
   const key = getRazorpayKeyId();
   const secret = getRazorpayKeySecret();
-  return Boolean(key && secret && !key.includes('placeholder') && !secret.includes('placeholder'));
+  return Boolean(
+    key &&
+      secret &&
+      !key.includes('placeholder') &&
+      !secret.includes('placeholder') &&
+      key.startsWith('rzp_')
+  );
 }
 
 let razorpayClientInstance: Razorpay | null = null;
@@ -141,26 +147,10 @@ export async function createRazorpayOrder({
 }: CreateGatewayOrderParams) {
   const amountInPaise = Math.round(amount * 100);
 
-  // If running with mock/test placeholder keys during testing or offline development
   if (!isRazorpayConfigured()) {
-    const mockRazorpayOrderId = `order_${Math.random().toString(36).substring(2, 16)}`;
-    return {
-      id: mockRazorpayOrderId,
-      entity: 'order',
-      amount: amountInPaise,
-      amount_paid: 0,
-      amount_due: amountInPaise,
-      currency,
-      receipt: orderId.substring(0, 40),
-      status: 'created',
-      attempts: 0,
-      notes: {
-        novashopOrderId: orderId,
-        ...notes,
-      },
-      created_at: Math.floor(Date.now() / 1000),
-      isMock: true,
-    };
+    throw new Error(
+      'Razorpay payment credentials are not configured. Please set valid RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your environment variables to enable payments.'
+    );
   }
 
   const rzp = getRazorpayInstance();

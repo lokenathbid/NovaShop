@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Package, Heart, MapPin, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useWishlist } from '@/context/WishlistContext';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import AccountSidebar from '@/components/account/AccountSidebar';
 
 interface DbAddress {
@@ -219,7 +219,7 @@ export default function AccountPage() {
                           <p className="text-xs text-slate-500">{formatDate(order.createdAt)}</p>
                         </div>
                         <span className="text-sm text-white font-semibold">
-                          ₹{order.total.toLocaleString()}
+                          {formatCurrency(order.total)}
                         </span>
                         <ArrowRight size={14} className="text-slate-600" />
                       </Link>

@@ -24,7 +24,8 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import { openRazorpayCheckout } from '@/lib/razorpay-client';
+import { openRazorpayCheckout, isRazorpayClientConfigured } from '@/lib/razorpay-client';
+import { restoreBodyScroll } from '@/lib/scroll-lock';
 
 const TIMELINE_STEPS: { status: OrderStatus; label: string; icon: React.ElementType }[] = [
   { status: 'processing', label: 'Order Placed', icon: Package },
@@ -137,6 +138,7 @@ export default function OrderDetailPage() {
     fetchOrder();
     return () => {
       isMounted = false;
+      restoreBodyScroll();
     };
   }, [id]);
 
@@ -146,6 +148,13 @@ export default function OrderDetailPage() {
       setPaying(true);
       setPaymentActionError(null);
       setPaymentSuccessMsg(null);
+
+      // Pre-flight check for client credentials
+      if (!isRazorpayClientConfigured()) {
+        throw new Error(
+          'Razorpay Test Mode credentials are not configured. Please set NEXT_PUBLIC_RAZORPAY_KEY_ID, RAZORPAY_KEY_ID, and RAZORPAY_KEY_SECRET in your environment variables.'
+        );
+      }
 
       // 1. Create or retrieve gateway order
       const res = await fetch('/api/payments/create', {
@@ -159,11 +168,27 @@ export default function OrderDetailPage() {
         throw new Error(data.error || 'Failed to initiate payment.');
       }
 
+      // Validate gateway response
+      const { keyId, razorpayOrderId, amount } = data;
+      if (!keyId || keyId.includes('placeholder') || !keyId.startsWith('rzp_')) {
+        throw new Error(
+          'Razorpay credentials are not configured on the server. Please set valid keys in your environment variables.'
+        );
+      }
+
+      if (!razorpayOrderId || !razorpayOrderId.startsWith('order_')) {
+        throw new Error('Invalid Razorpay order ID received from server.');
+      }
+
+      if (typeof amount !== 'number' || amount <= 0) {
+        throw new Error('Invalid payment amount received from server.');
+      }
+
       // 2. Open Razorpay Checkout modal
       await openRazorpayCheckout({
-        keyId: data.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
-        orderId: data.razorpayOrderId,
-        amount: data.amount,
+        keyId,
+        orderId: razorpayOrderId,
+        amount,
         currency: data.currency || 'INR',
         name: 'NovaShop',
         description: `Order #${order.id}`,
@@ -173,6 +198,7 @@ export default function OrderDetailPage() {
         },
         onSuccess: async (rzpResponse) => {
           try {
+            restoreBodyScroll();
             // 3. Server-side signature verification
             const verifyRes = await fetch('/api/payments/verify', {
               method: 'POST',
@@ -193,12 +219,14 @@ export default function OrderDetailPage() {
             setOrder(verifyData.order);
             setPaymentSuccessMsg('Payment successfully verified and captured!');
           } catch (vErr: any) {
+            restoreBodyScroll();
             setPaymentActionError(vErr.message || 'Payment verification failed on the server.');
           } finally {
             setPaying(false);
           }
         },
         onDismiss: async () => {
+          restoreBodyScroll();
           setPaying(false);
           setPaymentActionError('Payment window was dismissed before completion.');
           try {
@@ -221,6 +249,7 @@ export default function OrderDetailPage() {
           }
         },
         onFailure: async (failData) => {
+          restoreBodyScroll();
           setPaying(false);
           setPaymentActionError(
             `Payment failed: ${failData?.description || 'Transaction was declined.'}`
@@ -248,6 +277,7 @@ export default function OrderDetailPage() {
         },
       });
     } catch (err: any) {
+      restoreBodyScroll();
       console.error('Payment initiation error:', err);
       setPaymentActionError(err.message || 'Could not launch payment gateway.');
       setPaying(false);

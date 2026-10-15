@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-utils';
 import { initiateOrderPayment } from '@/lib/payments';
+import { isRazorpayConfigured } from '@/lib/razorpay';
 
 /**
  * POST /api/payments/create
@@ -26,6 +27,16 @@ export async function POST(request: Request) {
     const { orderId } = body;
     if (!orderId || typeof orderId !== 'string') {
       return NextResponse.json({ error: 'Valid Order ID is required.' }, { status: 400 });
+    }
+
+    if (!isRazorpayConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            'Razorpay payment gateway is not configured. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your environment variables to enable payments.',
+        },
+        { status: 400 }
+      );
     }
 
     const result = await initiateOrderPayment({

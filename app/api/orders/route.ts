@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-utils';
 import { createOrderFromCart, getUserOrders } from '@/lib/orders';
 import { initiateOrderPayment } from '@/lib/payments';
+import { isRazorpayConfigured } from '@/lib/razorpay';
 
 /**
  * GET /api/orders
@@ -74,6 +75,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // If online payment selected, ensure Razorpay credentials are configured before placing order
+    if (paymentMethod !== 'cod' && !isRazorpayConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            'Razorpay payment gateway is not configured. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your environment variables to enable card and UPI payments.',
+        },
+        { status: 400 }
+      );
+    }
+
     const result = await createOrderFromCart({
       userId: authUser.id,
       addressId,
@@ -96,8 +108,15 @@ export async function POST(request: Request) {
           currency: paymentInit.currency,
           keyId: paymentInit.keyId,
         };
-      } catch (payErr) {
+      } catch (payErr: any) {
         console.error('Failed to initialize Razorpay payment for order:', payErr);
+        return NextResponse.json(
+          {
+            error: payErr?.message || 'Failed to initialize payment gateway order.',
+            order: result.order,
+          },
+          { status: 500 }
+        );
       }
     }
 

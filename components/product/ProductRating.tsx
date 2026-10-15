@@ -51,7 +51,7 @@ export default function ProductRating({
       </div>
       <span className={cn('font-medium text-amber-400', textSize)}>{rating.toFixed(1)}</span>
       {showCount && reviewCount !== undefined && (
-        <span className={cn('text-slate-500', textSize)}>({reviewCount.toLocaleString()})</span>
+        <span className={cn('text-slate-500', textSize)}>({reviewCount.toLocaleString('en-IN')})</span>
       )}
     </div>
   );

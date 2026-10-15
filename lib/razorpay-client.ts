@@ -1,5 +1,20 @@
 'use client';
 
+import { lockBodyScroll } from '@/lib/scroll-lock';
+
+/**
+ * Checks whether Razorpay public key is configured for client-side usage.
+ */
+export function isRazorpayClientConfigured(): boolean {
+  if (typeof window === 'undefined') return false;
+  const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  return Boolean(
+    key &&
+      !key.includes('placeholder') &&
+      key.startsWith('rzp_')
+  );
+}
+
 /**
  * Loads Razorpay Checkout script dynamically in the browser.
  */
@@ -12,6 +27,16 @@ export function loadRazorpayCheckoutScript(): Promise<boolean> {
 
     if ((window as any).Razorpay) {
       resolve(true);
+      return;
+    }
+
+    // Check if script tag already exists in DOM
+    const existingScript = document.querySelector(
+      'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+    );
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true), { once: true });
+      existingScript.addEventListener('error', () => resolve(false), { once: true });
       return;
     }
 
@@ -49,7 +74,8 @@ export interface RazorpayCheckoutOptions {
 }
 
 /**
- * Opens Razorpay standard checkout popup.
+ * Validates options and safely opens Razorpay standard checkout popup.
+ * Preserves scroll state and ensures scroll lock and DOM overlays are reliably cleaned up.
  */
 export async function openRazorpayCheckout({
   keyId,
@@ -63,12 +89,50 @@ export async function openRazorpayCheckout({
   onDismiss,
   onFailure,
 }: RazorpayCheckoutOptions): Promise<boolean> {
+  // 1. Validate credentials and options before touching SDK or DOM
+  if (!keyId || keyId.includes('placeholder') || !keyId.startsWith('rzp_')) {
+    throw new Error(
+      'Razorpay Test Mode credentials are not configured. Please set NEXT_PUBLIC_RAZORPAY_KEY_ID in your environment variables.'
+    );
+  }
+
+  if (!orderId || typeof orderId !== 'string' || !orderId.startsWith('order_')) {
+    throw new Error(
+      'Invalid Razorpay order ID received from server. A valid order ID is required.'
+    );
+  }
+
+  if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+    throw new Error('Invalid payment amount. Amount must be a positive number in paise.');
+  }
+
+  // 2. Load SDK script
   const isLoaded = await loadRazorpayCheckoutScript();
   if (!isLoaded || !(window as any).Razorpay) {
     throw new Error(
       'Razorpay Checkout SDK could not be loaded. Please check your internet connection.'
     );
   }
+
+  // 3. Manage scroll lock with preservation of previous overflow styles
+  const unlockScroll = lockBodyScroll();
+  let isCleanedUp = false;
+
+  const cleanup = () => {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
+    unlockScroll();
+
+    // Clean up any lingering razorpay container or backdrops if orphaned
+    if (typeof document !== 'undefined') {
+      const rzpContainers = document.querySelectorAll('.razorpay-container');
+      rzpContainers.forEach((el) => {
+        try {
+          el.remove();
+        } catch {}
+      });
+    }
+  };
 
   const options: any = {
     key: keyId,
@@ -86,6 +150,7 @@ export async function openRazorpayCheckout({
       color: '#6366f1', // NovaShop Indigo
     },
     handler: function (response: any) {
+      cleanup();
       onSuccess({
         razorpay_order_id: response.razorpay_order_id,
         razorpay_payment_id: response.razorpay_payment_id,
@@ -94,6 +159,7 @@ export async function openRazorpayCheckout({
     },
     modal: {
       ondismiss: function () {
+        cleanup();
         if (onDismiss) onDismiss();
       },
     },
@@ -101,14 +167,29 @@ export async function openRazorpayCheckout({
 
   try {
     const rzp = new (window as any).Razorpay(options);
+
     if (onFailure) {
       rzp.on('payment.failed', function (resp: any) {
+        cleanup();
         onFailure(resp?.error);
       });
     }
+
+    // Fallback: If Razorpay removes its DOM container without triggering ondismiss
+    if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined') {
+      const observer = new MutationObserver(() => {
+        if (!document.querySelector('.razorpay-container')) {
+          cleanup();
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true });
+    }
+
     rzp.open();
     return true;
   } catch (err) {
+    cleanup();
     console.error('Failed to open Razorpay modal:', err);
     throw err;
   }

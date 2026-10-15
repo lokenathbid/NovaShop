@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { lockBodyScroll } from '@/lib/scroll-lock';
 import { cn } from '@/lib/utils';
 
 interface ModalProps {
@@ -40,15 +41,12 @@ export default function Modal({
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
-  // Prevent body scroll
+  // Prevent body scroll safely preserving previous overflow styles
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!isOpen) return;
+    const unlock = lockBodyScroll();
     return () => {
-      document.body.style.overflow = '';
+      unlock();
     };
   }, [isOpen]);
 

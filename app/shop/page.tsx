@@ -248,7 +248,7 @@ export default function ShopPage() {
               />
               <div className="flex justify-between text-xs text-slate-500 mt-1">
                 <span>₹500</span>
-                <span className="text-white font-medium">₹{priceMax.toLocaleString()}</span>
+                <span className="text-white font-medium">₹{priceMax.toLocaleString('en-IN')}</span>
               </div>
             </div>
 

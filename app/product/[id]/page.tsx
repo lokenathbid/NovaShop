@@ -554,7 +554,7 @@ export default function ProductPage() {
             </div>
           ) : (
             <p className="text-slate-500 text-sm">
-              This product has {product.reviewCount.toLocaleString()} verified reviews with an
+              This product has {product.reviewCount.toLocaleString('en-IN')} verified reviews with an
               average of {product.rating} stars.
             </p>
           )}

@@ -26,7 +26,8 @@ import { formatCurrency } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import type { Address, Order } from '@/types';
-import { openRazorpayCheckout } from '@/lib/razorpay-client';
+import { openRazorpayCheckout, isRazorpayClientConfigured } from '@/lib/razorpay-client';
+import { restoreBodyScroll } from '@/lib/scroll-lock';
 
 type PaymentMethod = 'card' | 'upi' | 'cod';
 type DeliveryMethod = 'standard' | 'express' | 'overnight';
@@ -85,6 +86,9 @@ export default function CheckoutPage() {
     if (!idempotencyKeyRef.current) {
       idempotencyKeyRef.current = `checkout-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     }
+    return () => {
+      restoreBodyScroll();
+    };
   }, []);
 
   // Fetch saved addresses
@@ -228,6 +232,14 @@ export default function CheckoutPage() {
       }
     }
 
+    // Step 0: If online payment selected, detect missing Razorpay credentials before opening popup
+    if (payment !== 'cod' && !isRazorpayClientConfigured()) {
+      setError(
+        'Razorpay Test Mode credentials are not configured. Please set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and NEXT_PUBLIC_RAZORPAY_KEY_ID in your environment variables to enable card and UPI payments.'
+      );
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -243,24 +255,75 @@ export default function CheckoutPage() {
         payload.addressId = selectedAddressId;
       }
 
-      // Step 1 & 2: Create local order and gateway order on server using authoritative prices
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let data: any;
 
-      const data = await res.json();
+      // If user previously placed order that remained unpaid in this session, re-initiate payment
+      if (pendingOrder && payment !== 'cod') {
+        const payRes = await fetch('/api/payments/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: pendingOrder.id }),
+        });
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to place order.');
+        const payData = await payRes.json();
+        if (!payRes.ok) {
+          throw new Error(payData.error || 'Failed to re-initiate payment.');
+        }
+
+        data = {
+          order: pendingOrder,
+          razorpay: {
+            orderId: payData.razorpayOrderId,
+            amount: payData.amount,
+            currency: payData.currency,
+            keyId: payData.keyId,
+          },
+        };
+      } else {
+        // Step 1 & 2: Create local order and gateway order on server using authoritative prices
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to place order.');
+        }
       }
 
       // If Cash on Delivery, no gateway required
-      if (payment === 'cod' || !data.razorpay) {
+      if (payment === 'cod') {
         await refreshCart();
         router.push(`/orders/${data.order.id}?confirmed=true`);
         return;
+      }
+
+      // Validate payment gateway response from server before opening Razorpay
+      if (!data.razorpay || typeof data.razorpay !== 'object') {
+        throw new Error(
+          'Payment gateway initialization failed: No payment order received from server.'
+        );
+      }
+
+      const { keyId, orderId: rzpOrderId, amount: rzpAmount } = data.razorpay;
+
+      if (!keyId || keyId.includes('placeholder') || !keyId.startsWith('rzp_')) {
+        throw new Error(
+          'Razorpay credentials are not configured on the server. Please set valid RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your environment variables.'
+        );
+      }
+
+      if (!rzpOrderId || typeof rzpOrderId !== 'string' || !rzpOrderId.startsWith('order_')) {
+        throw new Error(
+          'Invalid Razorpay order ID received from server. A valid order ID is required.'
+        );
+      }
+
+      if (typeof rzpAmount !== 'number' || rzpAmount <= 0) {
+        throw new Error('Invalid payment amount received from server.');
       }
 
       // Step 3 & 4: Open Razorpay Checkout with authoritative details
@@ -270,9 +333,9 @@ export default function CheckoutPage() {
 
       try {
         await openRazorpayCheckout({
-          keyId: data.razorpay.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
-          orderId: data.razorpay.orderId,
-          amount: data.razorpay.amount,
+          keyId,
+          orderId: rzpOrderId,
+          amount: rzpAmount,
           currency: data.razorpay.currency || 'INR',
           name: 'NovaShop',
           description: `Order #${data.order.id}`,
@@ -284,6 +347,7 @@ export default function CheckoutPage() {
           onSuccess: async (rzpResponse) => {
             // Step 5 & 6: Cryptographic server-side verification of payment signature
             try {
+              restoreBodyScroll();
               setVerifying(true);
               const verifyRes = await fetch('/api/payments/verify', {
                 method: 'POST',
@@ -305,6 +369,7 @@ export default function CheckoutPage() {
               await refreshCart();
               router.push(`/orders/${data.order.id}?confirmed=true&paid=true`);
             } catch (vErr: any) {
+              restoreBodyScroll();
               console.error('Payment verification error:', vErr);
               setError(vErr.message || 'Payment verification failed on the server.');
               setSubmitting(false);
@@ -315,6 +380,7 @@ export default function CheckoutPage() {
           },
           onDismiss: async () => {
             // Handle abandoned or dismissed payment window safely
+            restoreBodyScroll();
             setSubmitting(false);
             setVerifying(false);
             setError(
@@ -338,6 +404,7 @@ export default function CheckoutPage() {
           },
           onFailure: async (failData) => {
             // Handle explicit card/bank decline from Razorpay
+            restoreBodyScroll();
             setSubmitting(false);
             setVerifying(false);
             setError(
@@ -363,6 +430,7 @@ export default function CheckoutPage() {
           },
         });
       } catch (checkoutErr: any) {
+        restoreBodyScroll();
         console.error('Razorpay initialization error:', checkoutErr);
         setSubmitting(false);
         setVerifying(false);
@@ -373,6 +441,7 @@ export default function CheckoutPage() {
         );
       }
     } catch (err: any) {
+      restoreBodyScroll();
       console.error('Order placement error:', err);
       setError(err?.message || 'Something went wrong while placing your order.');
       idempotencyKeyRef.current = `checkout-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -701,6 +770,23 @@ export default function CheckoutPage() {
                 </label>
               ))}
             </div>
+
+            {payment !== 'cod' && !isRazorpayClientConfigured() && (
+              <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-3">
+                <AlertCircle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-200">Razorpay Test Mode Credentials Required</p>
+                  <p className="text-amber-300/80 mt-1 leading-relaxed">
+                    Razorpay test keys have not been configured yet. To test online payments, please set{' '}
+                    <code className="px-1.5 py-0.5 rounded bg-black/40 text-amber-200 font-mono">NEXT_PUBLIC_RAZORPAY_KEY_ID</code>,{' '}
+                    <code className="px-1.5 py-0.5 rounded bg-black/40 text-amber-200 font-mono">RAZORPAY_KEY_ID</code>, and{' '}
+                    <code className="px-1.5 py-0.5 rounded bg-black/40 text-amber-200 font-mono">RAZORPAY_KEY_SECRET</code> in your local{' '}
+                    <code className="px-1.5 py-0.5 rounded bg-black/40 text-amber-200 font-mono">.env</code> file. Alternatively, select{' '}
+                    <span className="font-semibold text-white">Cash on Delivery (COD)</span> to test placing an order without payment gateway keys.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-center gap-2.5">
               <ShieldCheck size={16} className="flex-shrink-0" />
